@@ -1,4 +1,4 @@
-# AbstrctMachine
+# AbstractMachine
 A kind of meta-linguistic framework for defining formal languages and abstract machines in C++. 
 
 <br> Compile with -std=c++2c or -std=c++26 
