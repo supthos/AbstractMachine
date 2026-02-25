@@ -23,6 +23,7 @@
 #include <locale>
 #include <charconv>
 #include <string_view>
+#include <unordered_map>
 
 
 
@@ -269,7 +270,7 @@ std::set<char8_t> GetCharacterSet(int (*predicate)(int)) {
 
 // The Language struct represents a formal language defined by an alphabet and a set of interpretations (concepts). It provides methods to add symbols, check if a program is well-formed, and evaluate programs based on the defined syntax and semantics.
 template <Value V>
-struct Language {
+class Language {
 	using Alphabet = std::set<Program<V>>;
 
 	
@@ -279,8 +280,29 @@ struct Language {
 	using Concept = std::tuple<Token<V>, Syntax, Semantic>;
 	using Interpretation = std::vector<Concept>;
 
+	public:
 	Alphabet A;
 	Interpretation I;
+
+	Language() {
+
+		// order matters, so we must be topological about this
+		// the first we list here have least precedence, the last have most precedence
+		// When listing interpretation, do so from most general to most specialized.
+		InterpretPredicate(std::iscntrl, u8"control");
+		InterpretPredicate(std::isprint, u8"printable");
+		InterpretPredicate(std::isgraph, u8"graphic");
+		InterpretPredicate(std::isalnum, u8"alphanumeric");
+		InterpretPredicate(std::isalpha, u8"alphabetical");
+		InterpretPredicate(std::isupper, u8"upper");
+		InterpretPredicate(std::islower, u8"lower");
+		InterpretPredicate(std::ispunct, u8"punctuation");
+		InterpretPredicate(std::isxdigit, u8"hexadecimal");
+		InterpretPredicate(std::isdigit, u8"digit");
+		InterpretPredicate(std::isspace, u8"space");
+		InterpretPredicate(std::isblank, u8"blank");
+
+	}
 
 		// Helper function to extract the first token from a program, returning it and modifying the original program to remove the extracted token
 	Medium<V> Munch(Medium<V>& prog) {
@@ -515,6 +537,15 @@ struct Language {
 		);
 	}
 
+	void InterpretMediumFunction(const Token<V>& name, const std::set<Medium<V>>& comms, std::function<std::any(const Medium<V>&)> f) {
+		 Interpret(
+			std::set<Program<V>>{}, 
+			name, 
+			[this, comms](const Token<V>& prog) { return this->MediumFunctionSyntax(prog, comms); },
+			[this, f](const Token<V>& prog) { return this->MediumFunctionSemantic(prog, f); }
+		);
+	}
+
 	// FunctionName: Args... -> Ret = { } 
 	// Helper function to interpret a function with a specific syntax and semantics based on its return type and argument types
 	template <Value Ret, Value...Args>
@@ -567,7 +598,26 @@ struct Language {
 	std::any IdentitySemantic(std::any a) {
 		return a;
 	}
-	
+
+	// The string could also be empty after the name. Use semantics to disambiguate.
+	bool MediumFunctionSyntax(const Token<V>& prog, const std::set<Medium<char8_t>>& comnames) {
+		if (std::holds_alternative<Medium<V>>(prog)) {
+			Medium<V> command = Lick(std::get<Medium<char8_t>>(prog));
+			if ( comnames.contains(std::get<Medium<char8_t>>(ToLower(command)))){
+				ProgramFile<char8_t> file = Chunkify(std::get<Medium<char8_t>>(prog));
+				return true;
+			}
+		}
+		return false;
+	}
+
+	std::any MediumFunctionSemantic(const Token<V>& prog, std::function<std::any(const Medium<V>&)> f) {
+		Medium<char8_t> program = std::get<Medium<char8_t>>(prog);
+		Munch(program);
+		return f(program);
+	}
+
+
 	// Evaluate a program by checking each interpretation's syntax and returning the corresponding semantic value if a match is found
 	// Returns a pair. First is the name or the type of the object evaluated. Second is the result of the evaluation.
 
@@ -593,7 +643,8 @@ class States : public Resource {
 	/*enum class Symbols: char {
 		SE, LD, UL, CL
 	};*/
-	ProgramFile<char8_t> File;
+	//ProgramFile<char8_t> File; // Holds the states of the machine as a program file. 
+
 	States() {
 		//resource = File;
 		//resource = { File {} };
@@ -613,12 +664,17 @@ class States : public Resource {
 		//language.A.insert("call");
 		//language.A.insert("CL");
 		//language.I.
+		language.InterpretMediumFunction(u8"load", ld, [this](const Medium<char8_t>& p) { return this->Load(p); });
+		language.InterpretMediumFunction(u8"unload", ud, [this](const Medium<char8_t>& p) { return this->Unload(p); });
+
 	}
 
 	std::set<Medium<char8_t>> ld = {u8"load", u8"ld"};
 	std::set<Medium<char8_t>> ud = {u8"unload", u8"ud"};
 	std::set<Medium<char8_t>> cl = {u8"call", u8"cl"};
 	std::set<Medium<char8_t>> se = {u8"state", u8"se"};
+	std::set<Medium<char8_t>> at = {u8"accept", u8"at"};
+	std::set<Medium<char8_t>> ne = {u8"name", u8"ne"};
 	
 
 	/*void Transition(Word<Program> P) {
@@ -628,43 +684,98 @@ class States : public Resource {
 			language.I.push_back();
 		}
 	}*/
-	
-	unsigned state = 0; // current state 
-	unsigned icount = 0; // instruction counter
-	std::vector<unsigned> instnum{}; //Instruction number stack
-	std::vector<unsigned> previous{}; //Previous
-	std::set<unsigned> accepting{};
+	enum StateKind : int { 
+		ER = -1, // Error state
+		NL = 0, // Normal state
+		AG = 1, // Accepting state
+	};
 
-	unsigned State() const { return state; }
 
-	unsigned Load(const Medium<char8_t>& program) {
-		unsigned count = 0;
-		Medium<char8_t> prog = u8"";
-		Medium<char8_t> Buffer = program;
-		// USE MUNCH HERE INSTEAD 
+	std::unordered_map<unsigned long long, Token<char8_t>> states; // Maps state numbers to their corresponding tokens (programs).
+	std::hash<Token<char8_t>> hasher; // Maps tokens (programs) to their corresponding state numbers for quick lookup.
 
-		while ( std::get<Medium<char8_t>>(ToLower(language.Munch(Buffer)))!= u8""){
-			
+	// state 0 is the starting state by default 
+	unsigned long long state = 0; // current state register
+	//unsigned icount = 0; // instruction counter
+	std::vector<unsigned long long> instnum{}; //Instruction number stack
+	std::vector<unsigned long long> previous{}; //Previous
+	std::set<unsigned long long> accepting{};
+
+	unsigned long long State() const { return state; }
+
+	std::pair<StateKind,unsigned long long> Load(const Token<char8_t>& program) {
+		Medium<char8_t> prog = std::get<Medium<char8_t>>(program);
+		StateKind kind = StateKind::NL;
+		Medium<char8_t> name;
+		unsigned long long new_state;
+
+		if (at.contains(std::get<Medium<char8_t>>(ToLower(language.Lick(prog))))) {
+			kind = StateKind::AG;
+			language.Munch(prog); // Remove "accept"
 		}
 
-
-		for (auto it = program.begin(); it != program.end(); ++it) {
-			if (*it != LD) {
-				prog += (*it);
-			}
-			else {
-				if (!prog.empty() && prog != u8"") {
-					File.push_back(prog);
-					count++;
+		if (!prog.empty()){
+			if(ne.contains(std::get<Medium<char8_t>>(ToLower(language.Lick(prog))))) {
+				language.Munch(prog); // Remove "name"	
+				if (!prog.empty()){
+					name = language.Munch(prog);
+					if (!name.empty() && str_predicate(std::isalpha, name)) {
+						new_state = hasher(name);
+					} 
 				}
-				prog = u8"";
 			}
 		}
-		if (!prog.empty() && prog != u8"") {
-			File.push_back(prog);
-			count++;
+		else {
+			return std::make_pair(StateKind::ER, 0); // Invalid name
 		}
-		return count;
+
+		if (!prog.empty()) {
+			new_state = hasher(prog);
+		}
+		else {
+			return std::make_pair(StateKind::ER, 0); // Invalid name
+		}
+		
+		states[new_state] = program;
+		if (kind == StateKind::AG) {
+			accepting.insert(new_state);
+		}
+		return std::make_pair(kind, new_state);
+	}
+
+	unsigned long long Unload(Medium<char8_t> program) {
+		Medium<char8_t> prog = program;
+		language.Munch(prog); // Remove the command (e.g., "unload") to get the state identifier
+		unsigned long long s ;
+
+		if (prog.empty()) {
+			s = state;
+		}
+		else {
+			prog = language.Munch(prog); // Get the next token which should be the state identifier
+			if (!prog.empty()) {
+				if( str_predicate(std::isalpha, prog)) {
+					s = hasher(prog);
+				}
+				else if( str_predicate(std::isdigit, prog)) {
+					s = std::stoull(std::string(prog.begin(), prog.end()));
+				}
+			}
+			else return 0; // Invalid state identifier
+		}
+		if (states.contains(s)) {
+			states.erase(s);
+			if (accepting.contains(s))
+				accepting.erase(s);
+			if (state == s) {
+				state = previous.empty() ? 0 : previous.back();
+				if (!previous.empty()) {
+					previous.pop_back();
+				}
+			}
+			return state;
+		}
+		return 0; // Invalid state
 	}
 };
 
@@ -1031,27 +1142,12 @@ public:
 	
 	AbstractMachine() {
 
-		language.InterpretPredicate(std::isdigit, u8"digit");
-		language.InterpretPredicate(std::islower, u8"lower");
-		language.InterpretPredicate(std::isupper, u8"upper");
-		language.InterpretPredicate(std::isalpha, u8"alphabetical");
-		language.InterpretPredicate(std::isspace, u8"space");
-		language.InterpretPredicate(std::ispunct, u8"punctuation");
-		language.InterpretPredicate(std::isxdigit, u8"hexadecimal");
-		language.InterpretPredicate(std::isblank, u8"blank");
-		language.InterpretPredicate(std::isalnum, u8"alphanumeric");
-		language.InterpretPredicate(std::isgraph, u8"graphic");
-		language.InterpretPredicate(std::isprint, u8"printable");
-		language.InterpretPredicate(std::iscntrl, u8"control");
 
-		language.Interpret(
-			std::set<char8_t>{},
-			u8"run",
-			[this](const Token<char8_t>& prog) { return this->RunSyntax(prog); },
-			[this](const Token<char8_t>& prog) { return this->RunSemantic(prog); }
-		);
+		language.InterpretMediumFunction(u8"run", RunComms, [this](const Medium<char8_t>& prog) { return this->Run(prog); });
+
+
+
 		//AddResource("type", Types);
-
 	}
 
 	~AbstractMachine() {};
@@ -1060,11 +1156,12 @@ public:
 	//std::vector <const std::type_info*> types;
 	//std::vector <Medium<unsigned char>> types;
 
-	std::any Run(const Token<char8_t> prog) {
+	std::set<Medium<char8_t>> RunComms = { u8"run", u8"rn"};
+
+	std::any Run(const Medium<char8_t> prog) {
 		if (language.is_well_formed(prog)) {
 			return language.Evaluate(prog).second;
 		}
-
 		// fallback for default interpretation
 		// because if you invoke a resource first, it's done through the machine language.
 		for (Resource& res : Resources) {
@@ -1072,29 +1169,7 @@ public:
 				return res.language.Evaluate(prog).second;
 			}
 		}
-
-		
 		return {};
-	}
-
-	bool RunSyntax(const Token<char8_t>& prog) {
-		if (std::holds_alternative<Program<char8_t>>(prog))
-			return false;
-		if (std::holds_alternative<Medium<char8_t>>(prog)){
-			Medium<char8_t> command = language.Lick(std::get<Medium<char8_t>>(prog));
-			std::set<std::u8string> comnames = { u8"run", u8"rn"};
-			if ( comnames.contains(std::get<Medium<char8_t>>(ToLower(command))) && (std::get<Medium<char8_t>>(prog)).size() > (command).size())
-				return true;
-		}
-	}
-
-	std::any RunSemantic(const Token<char8_t>& prog) {
-		Medium<char8_t> program = std::get<Medium<char8_t>>(prog);
-		if (RunSyntax(prog) == true) {
-			language.Munch(program);
-			return Run(program);
-		}
-		return std::any{};
 	}
 
 	bool ResNameSyntax(const Token<char8_t>& name, const Token<char8_t>& prog, Resource res) {
