@@ -6,26 +6,19 @@
 #include <print>
 #include <format>
 
-//class AbstractMachine {
-//public:
-//    void Start() {}
-//    void Quit() {}
-//    int Load() { return 0; }
-//    int Run() { return 0; }
-//    std::any P;
-//    std::map<std::string, std::any> SymTable;
-//};
-
-
 int main()
 {
 
-    std::cout << "Hello World!\n";
+    std::cout << "This is Abstract Machine!\n";
+    std::cout << "Copyright © 2026 Guillermo M. Dávila Andino\n";
+    std::cout << "All rights reserved.\n";
 
     //AbstractMachine AM1;
 
 
-    Substrate<char8_t> a;
+    //Substrate<char8_t> a;
+
+    AbstractMachine a;
     
     auto [tok, result] = a.language.Evaluate(u8"5628");
     
@@ -46,15 +39,21 @@ int main()
         }
     }
 
+    ProgramFile<char8_t> pf;
+    pf.push_back(u8"start 16");
+    pf.push_back(u8"write 1");
+    pf.push_back(u8"left");
+    pf.push_back(u8"write 1");
+    pf.push_back(u8"left");
+    pf.push_back(u8"write 1");
+    pf.push_back(u8"end");
+
+
+    try {
+        a.LoadAndRun(pf);
+    } catch (const std::exception& e) {
+        std::cerr << "Aborted with error: " << e.what() << std::endl;
+    }
+
 }
 
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
