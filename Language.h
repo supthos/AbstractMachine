@@ -97,124 +97,124 @@ using Medium = typename MediumHelper<V>::type;
 template <Value V>
 using ProgramFile = std::vector<Medium<V>>;
 
-// The Symbol struct represents a symbol in the language, which can hold a value of an arithmetic type and can be constructed from a program (text) representation. It also provides an implicit conversion to the underlying value type and to the program representation.
-// It unifies the handling of conversion of arithmetic types to text. I guess it is a form of serialization.
-template <Arithmetic A, Text T>
-struct Symbol {
-	A value;
-	using inner_type = A;
-	Symbol(const A& val) : value(val) {}
-
-	// ... (operator== and default constructor are correct) ...
-	Symbol() : value(A{}) {}
-	bool operator==(const Symbol& other) const noexcept {
-		return value == other.value;
-	}
-	bool operator==(const A& other) const noexcept {
-		return value == other;
-	}
-
-	// 2. Input Requirement: V(Program) constructor (Corrected)
-	Symbol(const Program<T>& p) {
-		if (p.empty()) {
-			value = A{};
-			return;
-		}
-
-		if constexpr (std::is_same_v<A, bool>) {
-			// FIX: Use robust string comparison
-			std::u8string lower_p;
-			std::transform(p.begin(), p.end(), std::back_inserter(lower_p), ::tolower);
-			value = (lower_p == u8"true" || lower_p == u8"1");
-		}
-		// else if constexpr (std::is_integral_v<A>) {
-		// 	// FIX: Add try/catch and explicit cast
-		// 	try {
-		// 		value = static_cast<A>(std::stoll(p));
-		// 	}
-		// 	catch (const std::exception&) {
-		// 		value = A{}; // Fallback to zero
-		// 	}
-		// }
-		// else if constexpr (std::is_floating_point_v<A>) {
-		// 	// FIX: Add try/catch and explicit cast
-		// 	try {
-		// 		value = static_cast<A>(std::stod(p));
-		// 	}
-		// 	catch (const std::exception&) {
-		// 		value = A{}; // Fallback to zero
-		// 	}
-		// }
-		// else {
-		// 	value = A{};
-		// }
-		else if constexpr (std::is_arithmetic_v<A>) {
-			// std::from_chars requires a raw char range
-			const char* first = reinterpret_cast<const char*>(p.data());
-			const char* last = first + p.size();
-			
-			auto [ptr, ec] = std::from_chars(first, last, value);
-
-			// If parsing fails (e.g., "abc" for an int), fall back to default
-			if (ec != std::errc{}) {
-				value = A{}; 
-			}
-		}
-		else {
-			value = A{};
-		}
-	}
-
-	// 3. Output Requirement: Implicit conversion operator
-	/*operator Program<T>() const {
-		return static_cast<T>(std::to_string(value));
-	}*/
-	// operator Program<T>() const {
-	// 	std::u8string temp = std::to_string(value);
-	// 	if constexpr (std::is_same_v<T, std::u8string>) {
-	// 		return temp;
-	// 	}
-	// 	// If T is another string type, proper conversion (e.g., std::wstring(temp.begin(), temp.end())) is required here.
-	// 	// If T is a Char type, the conversion is likely nonsensical.
-	// 	return static_cast<T>(temp); // Still problematic but illustrates the intent.
-	// }
-	operator Program<T>() const {
-		if constexpr (std::is_same_v<A, bool>) {
-			// Explicitly return string representations for boolean types
-			if constexpr (String<T>) {
-				return value ? T(u8"true") : T(u8"false");
-			} else {
-				return value ? static_cast<T>('1') : static_cast<T>('0');
-			}
-		} 
-		else if constexpr (std::is_arithmetic_v<A>) {
-			char buffer[64]; 
-			auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), value);
-			
-			if (ec == std::errc{}) {
-				std::u8string temp(reinterpret_cast<const char8_t*>(buffer), ptr - buffer);
-				
-				// Branch 1: T is a full string type
-				if constexpr (String<T>) {
-					return T(temp.begin(), temp.end());
-				}
-				// Branch 2: T is a single character type
-				else if constexpr (Char<T>) {
-					if (temp.size() == 1) {
-						return static_cast<T>(temp[0]);
-					}
-					// If it's a multi-digit number being forced into one char,
-					// we interpret the numeric value itself as the character code.
-					return static_cast<T>(value);
-				}
-			}
-		}
-		return Program<T>{}; 
-	}
-	operator A() const {
-		return value;
-	}
-};
+//// The Symbol struct represents a symbol in the language, which can hold a value of an arithmetic type and can be constructed from a program (text) representation. It also provides an implicit conversion to the underlying value type and to the program representation.
+//// It unifies the handling of conversion of arithmetic types to text. I guess it is a form of serialization.
+//template <Arithmetic A, Text T>
+//struct Symbol {
+//	A value;
+//	using inner_type = A;
+//	Symbol(const A& val) : value(val) {}
+//
+//	// ... (operator== and default constructor are correct) ...
+//	Symbol() : value(A{}) {}
+//	bool operator==(const Symbol& other) const noexcept {
+//		return value == other.value;
+//	}
+//	bool operator==(const A& other) const noexcept {
+//		return value == other;
+//	}
+//
+//	// 2. Input Requirement: V(Program) constructor (Corrected)
+//	Symbol(const Program<T>& p) {
+//		if (p.empty()) {
+//			value = A{};
+//			return;
+//		}
+//
+//		if constexpr (std::is_same_v<A, bool>) {
+//			// FIX: Use robust string comparison
+//			std::u8string lower_p;
+//			std::transform(p.begin(), p.end(), std::back_inserter(lower_p), ::tolower);
+//			value = (lower_p == u8"true" || lower_p == u8"1");
+//		}
+//		// else if constexpr (std::is_integral_v<A>) {
+//		// 	// FIX: Add try/catch and explicit cast
+//		// 	try {
+//		// 		value = static_cast<A>(std::stoll(p));
+//		// 	}
+//		// 	catch (const std::exception&) {
+//		// 		value = A{}; // Fallback to zero
+//		// 	}
+//		// }
+//		// else if constexpr (std::is_floating_point_v<A>) {
+//		// 	// FIX: Add try/catch and explicit cast
+//		// 	try {
+//		// 		value = static_cast<A>(std::stod(p));
+//		// 	}
+//		// 	catch (const std::exception&) {
+//		// 		value = A{}; // Fallback to zero
+//		// 	}
+//		// }
+//		// else {
+//		// 	value = A{};
+//		// }
+//		else if constexpr (std::is_arithmetic_v<A>) {
+//			// std::from_chars requires a raw char range
+//			const char* first = reinterpret_cast<const char*>(p.data());
+//			const char* last = first + p.size();
+//			
+//			auto [ptr, ec] = std::from_chars(first, last, value);
+//
+//			// If parsing fails (e.g., "abc" for an int), fall back to default
+//			if (ec != std::errc{}) {
+//				value = A{}; 
+//			}
+//		}
+//		else {
+//			value = A{};
+//		}
+//	}
+//
+//	// 3. Output Requirement: Implicit conversion operator
+//	/*operator Program<T>() const {
+//		return static_cast<T>(std::to_string(value));
+//	}*/
+//	// operator Program<T>() const {
+//	// 	std::u8string temp = std::to_string(value);
+//	// 	if constexpr (std::is_same_v<T, std::u8string>) {
+//	// 		return temp;
+//	// 	}
+//	// 	// If T is another string type, proper conversion (e.g., std::wstring(temp.begin(), temp.end())) is required here.
+//	// 	// If T is a Char type, the conversion is likely nonsensical.
+//	// 	return static_cast<T>(temp); // Still problematic but illustrates the intent.
+//	// }
+//	operator Program<T>() const {
+//		if constexpr (std::is_same_v<A, bool>) {
+//			// Explicitly return string representations for boolean types
+//			if constexpr (String<T>) {
+//				return value ? T(u8"true") : T(u8"false");
+//			} else {
+//				return value ? static_cast<T>('1') : static_cast<T>('0');
+//			}
+//		} 
+//		else if constexpr (std::is_arithmetic_v<A>) {
+//			char buffer[64]; 
+//			auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), value);
+//			
+//			if (ec == std::errc{}) {
+//				std::u8string temp(reinterpret_cast<const char8_t*>(buffer), ptr - buffer);
+//				
+//				// Branch 1: T is a full string type
+//				if constexpr (String<T>) {
+//					return T(temp.begin(), temp.end());
+//				}
+//				// Branch 2: T is a single character type
+//				else if constexpr (Char<T>) {
+//					if (temp.size() == 1) {
+//						return static_cast<T>(temp[0]);
+//					}
+//					// If it's a multi-digit number being forced into one char,
+//					// we interpret the numeric value itself as the character code.
+//					return static_cast<T>(value);
+//				}
+//			}
+//		}
+//		return Program<T>{}; 
+//	}
+//	operator A() const {
+//		return value;
+//	}
+//};
 
 template <Value V>
 using Token = std::variant<Medium<V>, Program<V>>;
@@ -272,8 +272,8 @@ template <Value V>
 class Language {
 	using Alphabet = std::set<Program<V>>;
 
-	
-	using Syntax = std::function<bool(const Token<V>&)>;
+	// Syntax returns unsigned long long. If zero, the syntax does not match. If non-zero, it indicates how many characters of the program were consumed by the syntax rule.
+	using Syntax = std::function<unsigned long long(const Token<V>&)>;
 	using Semantic = std::function<std::any (const Token<V>&)>;
 	//using Semantic = std::function<Value auto (const Medium<V>&)>;
 	using Concept = std::tuple<Token<V>, Syntax, Semantic>;
@@ -286,23 +286,27 @@ class Language {
 	Language() {
 
 	}
-
+	
+	
 	void AddCharacterInterpretations() {
 		// order matters, so we must be topological about this
 		// the first we list here have least precedence, the last have most precedence
 		// When listing interpretation, do so from most general to most specialized.
-		InterpretPredicate(std::iscntrl, u8"control");
-		InterpretPredicate(std::isprint, u8"printable");
-		InterpretPredicate(std::isgraph, u8"graphic");
-		InterpretPredicate(std::isalnum, u8"alphanumeric");
-		InterpretPredicate(std::isalpha, u8"alphabetical");
-		InterpretPredicate(std::isupper, u8"upper");
-		InterpretPredicate(std::islower, u8"lower");
-		InterpretPredicate(std::ispunct, u8"punctuation");
-		InterpretPredicate(std::isxdigit, u8"hexadecimal");
-		InterpretPredicate(std::isdigit, u8"digit");
-		InterpretPredicate(std::isspace, u8"space");
-		InterpretPredicate(std::isblank, u8"blank");
+		if constexpr (std::is_same_v<V, char8_t>) {
+			InterpretPredicate(std::iscntrl, u8"control");
+			InterpretPredicate(std::isprint, u8"printable");
+			InterpretPredicate(std::isgraph, u8"graphic");
+			InterpretPredicate(std::isalnum, u8"alphanumeric");
+			InterpretPredicate(std::isalpha, u8"alphabetical");
+			InterpretPredicate(std::isupper, u8"upper");
+			InterpretPredicate(std::islower, u8"lower");
+			InterpretPredicate(std::ispunct, u8"punctuation");
+			InterpretPredicate(std::isxdigit, u8"hexadecimal");
+			InterpretPredicate(std::isdigit, u8"digit");
+			InterpretPredicate(std::isspace, u8"space");
+			InterpretPredicate(std::isblank, u8"blank");
+		}
+
 	}
 
 	void AddTypeInterpretations() {
@@ -348,6 +352,24 @@ class Language {
 		return program;
 	}
 
+	// A proper Munch.
+	std::pair<Medium<V>, unsigned long long> Lunch(const Medium<V>& prog) {
+		Medium<V> program{};
+		size_t i = 0;
+		while (i < prog.size() && std::isspace(static_cast<unsigned char>(prog[i]))) {
+			++i;
+		}
+
+		while (i < prog.size() && !std::isspace(static_cast<unsigned char>(prog[i]))) {
+			program += prog[i];
+			++i;
+		}
+
+		while (i < prog.size() && std::isspace(static_cast<unsigned char>(prog[i]))) {
+			++i;
+		}
+		return std::make_pair(program, i);
+	}
 
 	// This function extracts the first bite of a program.
 	Program<V> Nibble (Medium<V> & prog){
@@ -449,16 +471,23 @@ class Language {
 		return false;
 	}
 
-	bool is_well_formed(const Token<V>& text) {
-		return is_word(text) && has_interpretation(text) ;
+	std::pair<const Concept*, unsigned long long> is_well_formed(const Token<V>& text) {
+		//return is_word(text) && has_interpretation(text) ;
+		if (is_word(text)) {
+			return has_interpretation(text);
+		}
+		throw std::invalid_argument("text is not well-formed: contains symbols not in the alphabet\n");
+		return { nullptr, 0 };
 	}
 	
 	// This function returns true if its syntax is recognized from within the Concepts
-	bool has_interpretation(const Token<V>& token) {
+
+	std::pair<const Concept*, unsigned long long> has_interpretation(const Token<V>& token) {
 		for (const Concept& c : I) {
-			if (std::get<1>(c)(token) == true) return true;
+			unsigned long long consumed = std::get<1>(c)(token);
+			if (consumed > 0) return {&c, consumed};
 		}
-		return false;
+		return { nullptr, 0 };
 	}
 
 	bool is_registered(const Token<V>& token) {
@@ -545,7 +574,7 @@ class Language {
 			return false;	
 		}
 
-		if (!has_interpretation(type_token)) {
+		if (has_interpretation(type_token).first != nullptr) {
 			T epsilon {};
 			return Interpret(type_token, epsilon);
 		}
@@ -638,11 +667,18 @@ class Language {
 	}
 
 	// Helper function to interpret a token as a Name (i.e., a valid identifier in the language)
-	bool NameSyntax(const Token<V>& t, const Token<V>& program) {
-		if (str_predicate(std::isalpha, t) && t == program){
-			return true;
+	unsigned long long NameSyntax(const Token<V>& t, const Token<V>& program) {
+		if constexpr (Text<V> && std::is_same_v<V, char8_t>) {
+			if (str_predicate(std::isalpha, t) && t == program) {
+				if (std::holds_alternative<Program<V>>(t)) {
+					return 1; // Single character token has length 1
+				}
+				else if (std::holds_alternative<Medium<V>>(t)) {
+					return std::get<Medium<V>>(t).size();
+				}
+			}
 		}
-		return false;
+		return 0;
 	}
 
 	// Helper function to interpret a token as a Name and return the result of a provided function if the syntax is valid
@@ -660,32 +696,29 @@ class Language {
 	}
 
 	// The string could also be empty after the name. Use semantics to disambiguate.
-	bool MediumFunctionSyntax(const Token<V>& prog, const std::set<Medium<char8_t>>& comnames) {
-		if (std::holds_alternative<Medium<V>>(prog)) {
-			Medium<V> command = Lick(std::get<Medium<char8_t>>(prog));
-			if ( comnames.contains(std::get<Medium<char8_t>>(ToLower(command)))){
-				return true;
+	unsigned long long MediumFunctionSyntax(const Token<V>& prog, const std::set<Medium<char8_t>>& comnames) {
+		if constexpr (Text<V> && std::is_same_v<V, char8_t>) {
+			if (std::holds_alternative<Medium<V>>(prog)) {
+				Medium<V> command = Lick(std::get<Medium<V>>(prog));
+				if (comnames.contains(std::get<Medium<V>>(ToLower(command)))) {
+					return std::get<Medium<V>>(prog).size();
+				}
 			}
 		}
-		return false;
+		return 0;
+
 	}
 
 	std::any MediumFunctionSemantic(const Token<V>& prog, std::function<std::any(const Medium<V>&)> f) {
 		Medium<char8_t> program = std::get<Medium<char8_t>>(prog);
-		Munch(program);
+		//Munch(program);
 		return f(program);
 	}
 
 
-	// Evaluate a program by checking each interpretation's syntax and returning the corresponding semantic value if a match is found
-	// Returns a pair. First is the name or the type of the object evaluated. Second is the result of the evaluation.
-
-	std::pair<Token<V>, std::any> Evaluate(const Token<V>& prog) {
-		for (const Concept& r : I) {
-			if (std::get<1>(r)(prog) == true)
-				return std::make_pair(std::get<0>(r), std::get<2>(r)(prog));
-		}
-		return std::make_pair(Token<V>{}, std::any{}); // Token{} instead of "Error" for type safety
+	std::any Evaluate(const Concept& C, const Token<V>& prog) {
+		auto [name, syn, sem] = C;
+		return sem(prog);
 	}
 
 };
@@ -694,10 +727,9 @@ class Resource {
 public:
     virtual ~Resource() = default;
     Language<char8_t> language;
-    std::any resource;
+    //std::any resource;
 };
 
-class AbstractMachine;
 
 class States : public Resource {
 public:
@@ -712,46 +744,19 @@ public:
 	/*enum class Symbols: char {
 		SE, LD, UL, CL
 	};*/
-	//ProgramFile<char8_t> File; // Holds the states of the machine as a program file. 
-	AbstractMachine* machine; // Pointer to the Abstract Machine, allowing state operations to affect the machine's execution.
-	States(AbstractMachine* mach) : machine(mach) {
-		resource = states;
-		//resource = File;
-		//resource = { File {} };
-		//Name = "States";
-		//language.A.insert("STATE"); // STATE
-		//language.A.insert("state");
-		//language.A.insert("SE");
-		//language.A.insert("LOAD"); // LOAD
-		//language.I.push_back()
 
-		//language.A.insert("load");
-		//language.A.insert("LD");
-		//language.A.insert("UNLOAD"); // UNLOAD
-		//language.A.insert("unload");
-		//language.A.insert("UD");
-		//language.A.insert("CALL"); // CONDITIONAL CALL
-		//language.A.insert("call");
-		//language.A.insert("CL");
-		//language.I.
+	States() {
+
 		language.AddCharacterInterpretations();
 		language.InterpretMediumFunction(u8"load", ld, [this](const Medium<char8_t>& p) { return this->Load(p); });
 		language.InterpretMediumFunction(u8"unload", ud, [this](const Medium<char8_t>& p) { return this->Unload(p); });
 
 
 		language.InterpretMediumFunction(u8"accepting", ag, [this](const Medium<char8_t>& p) { return this->AcceptingSemantic(p); });
+		language.InterpretMediumFunction(u8"state", se, [this](const Medium<char8_t>& p) { return this->State(); });
 	}
 
 
-	
-
-	/*void Transition(Word<Program> P) {
-		if (P.Formula == "state" 
-			|| P.Formula == "State" 
-			|| P.Formula == "STATE") {
-			language.I.push_back();
-		}
-	}*/
 	enum StateKind : int { 
 		ER = -1, // Error state
 		NL = 0, // Normal state
@@ -759,23 +764,24 @@ public:
 	};
 
 
-	std::unordered_map<unsigned long, Token<char8_t>> states; // Maps state numbers to their corresponding tokens (programs).
+	std::unordered_map<unsigned long long, Token<char8_t>> states; // Maps state numbers to their corresponding tokens (programs).
 	std::hash<Token<char8_t>> hasher; // Maps tokens (programs) to their corresponding state numbers for quick lookup.
 
 	// state 0 is the starting state by default 
-	unsigned long state = 0; // current state register
-	unsigned long icount = 0; // instruction counter within program
-	std::vector<unsigned long> instnum{}; //Instruction number stack
-	std::vector<unsigned long> previous{}; //Previous state stack for backtracking
-	std::set<unsigned long> accepting{};
+	unsigned long long state = 0; // current state register
+	unsigned long long icount = 0; // instruction counter within program
+	std::vector<unsigned long long> instnum{}; //Instruction number stack
+	std::vector<unsigned long long> previous{}; //Previous state stack for backtracking
+	std::set<unsigned long long> accepting{};
 
-	unsigned long State() const { return state; }
+	unsigned long long State() const { return state; }
 
-	std::pair<StateKind,unsigned long> Load(const Token<char8_t>& program) {
+	// Load returns a pair of the state kind and the new state number. 
+	std::pair<StateKind,unsigned long long> Load(const Token<char8_t>& program) {
 		Medium<char8_t> prog = std::get<Medium<char8_t>>(program);
 		StateKind kind = StateKind::NL;
 		Medium<char8_t> name;
-		unsigned long new_state;
+		unsigned long long new_state;
 
 		if (at.contains(std::get<Medium<char8_t>>(ToLower(language.Lick(prog))))) {
 			kind = StateKind::AG;
@@ -903,19 +909,26 @@ template <Value V>
 class Substrate: public Resource {
 public:
 
+	std::set<Medium<char8_t>> readcomms = {u8"read", u8"rd"};
+	std::set<Medium<char8_t>> headcomms = {u8"head", u8"hd"};
+	std::set<Medium<char8_t>> leftcomms = {u8"left", u8"lt"};
+	std::set<Medium<char8_t>> rightcomms = {u8"right", u8"rt"};
+	std::set<Medium<char8_t>> writecomms = {u8"write", u8"we"};
+	std::set<Medium<char8_t>> gotocomms = {u8"goto", u8"go"};
+	std::set<Medium<char8_t>> shrinkcomms = {u8"shrink", u8"sk"};
+	std::set<Medium<char8_t>> movecomms = {u8"move", u8"me"};
+
+
+	Medium<V> Tape;
+
+	long long head; 
+	unsigned char order;
+
+
 	Substrate() {
 		order = 16;
 		head = 0;
 		Tape = MakeTape(order);
-
-		std::set<Medium<char8_t>> readcomms = {u8"read", u8"rd"};
-		std::set<Medium<char8_t>> headcomms = {u8"head", u8"hd"};
-		std::set<Medium<char8_t>> leftcomms = {u8"left", u8"lt"};
-		std::set<Medium<char8_t>> rightcomms = {u8"right", u8"rt"};
-		// std::set<Medium<char8_t>> writecomms = {u8"write", u8"we"};
-		std::set<Medium<char8_t>> gotocomms = {u8"goto", u8"go"};
-		std::set<Medium<char8_t>> shrinkcomms = {u8"shrink", u8"sk"};
-		std::set<Medium<char8_t>> movecomms = {u8"move", u8"me"};
 
 		language.AddCharacterInterpretations();
 		/*language.Interpret(Digits, "digits", &Substrate<char>::DigitsSyntax, &Substrate<char>::DigitsSemantic);
@@ -986,60 +999,60 @@ public:
 	// }
 
 	std::any WriteSemantic(const Token<char8_t>& prog) {
-		if (WriteSyntax(prog) == true) {
-			Medium<char8_t> program = std::get<Medium<char8_t>>(prog);
-			language.Munch(program); // Remove "write" command
-			Medium<char8_t> valStr = language.Munch(program); // Get the data to write
+		Medium<char8_t> program = std::get<Medium<char8_t>>(prog);
+		language.Munch(program); // Remove "write" command
+		Medium<char8_t> valStr = language.Munch(program); // Get the data to write
 
-			// Case 0: Tape stores bool values
-			if constexpr (std::is_same_v<V, bool>) {
-				if (valStr == u8"true" || valStr == u8"1") {
-					return Write(true);
-				} else if (valStr == u8"false" || valStr == u8"0") {
-					return Write(false);
-				} else {
-					std::cout << "Invalid boolean value.\n";
-					return std::any{};
-				}
-			}
-			// Case 1: The Tape stores full Strings
-			else if constexpr (String<V>) {
-				// Program<V> is V, which is a string type.
-				// We can pass valStr (Medium<char8_t>) directly or cast it.
-				return Write(V(valStr)); 
-			} 
-			// Case 2: The Tape stores single Characters
-			else if constexpr (Char<V>) {
-				if (valStr.size() == 1) {
-					return Write(static_cast<V>(valStr[0]));
-				}
-				// Fallback for numeric codes (e.g., "65" -> 'A')
-				try {
-					std::string s(reinterpret_cast<const char*>(valStr.data()), valStr.size());
-					return Write(static_cast<V>(std::stoi(s)));
-				} catch (...) { return std::any{}; }
-			}
-			// Case 3: The Tape stores Numbers (int, long long, etc.)
-			else if constexpr (Arithmetic<V>) {
-				// Convert u8string to a char range for from_chars
-				const char* first = reinterpret_cast<const char*>(valStr.data());
-				const char* last = first + valStr.size();
-				V numericVal;
-
-				auto [ptr, ec] = std::from_chars(first, last, numericVal);
-
-				if (ec == std::errc{}) {
-					return Write(numericVal);
-				} else {
-					if (ec == std::errc::invalid_argument)
-						std::cout << "This is not a number.\n";
-					else if (ec == std::errc::result_out_of_range)
-						std::cout << "This number is larger than an int.\n";
-					// Handle error: result was out of range or not a number
-					return std::any{ptr, ec}; // Return parsing result for debugging
-				}
+		// Case 0: Tape stores bool values
+		if constexpr (std::is_same_v<V, bool>) {
+			valStr = std::get<Medium<char8_t>>(ToLower(valStr)); // Canonicalize input for boolean parsing
+			if (valStr == u8"true" || valStr == u8"1") {
+				return Write(true);
+			} else if (valStr == u8"false" || valStr == u8"0") {
+				return Write(false);
+			} else {
+				std::cout << "Invalid boolean value.\n";
+				return std::any{};
 			}
 		}
+		// Case 1: The Tape stores full Strings
+		else if constexpr (String<V>) {
+			// Program<V> is V, which is a string type.
+			// We can pass valStr (Medium<char8_t>) directly or cast it.
+			return Write(V(valStr)); 
+		} 
+		// Case 2: The Tape stores single Characters
+		else if constexpr (Char<V>) {
+			if (valStr.size() == 1) {
+				return Write(static_cast<V>(valStr[0]));
+			}
+			// Fallback for numeric codes (e.g., "65" -> 'A')
+			try {
+				std::string s(reinterpret_cast<const char*>(valStr.data()), valStr.size());
+				return Write(static_cast<V>(std::stoi(s)));
+			} catch (...) { return std::any{}; }
+		}
+		// Case 3: The Tape stores Numbers (int, long long, etc.)
+		else if constexpr (Arithmetic<V>) {
+			// Convert u8string to a char range for from_chars
+			const char* first = reinterpret_cast<const char*>(valStr.data());
+			const char* last = first + valStr.size();
+			V numericVal = 0;
+
+			auto [ptr, ec] = std::from_chars(first, last, numericVal);
+
+			if (ec == std::errc{}) {
+				return Write(numericVal);
+			} else {
+				if (ec == std::errc::invalid_argument)
+					std::cout << "This is not a number.\n";
+				else if (ec == std::errc::result_out_of_range)
+					std::cout << "This number is larger than an int.\n";
+				// Handle error: result was out of range or not a number
+				return std::any{ptr, ec}; // Return parsing result for debugging
+			}
+		}
+
 		return std::any{};
 	}
 
@@ -1053,17 +1066,115 @@ public:
 	// 	else return false;
 	// }
 
-	bool WriteSyntax(const Token<char8_t>& prog) {
-		if (std::holds_alternative<Program<char8_t>>(prog))
-			return false;
-		if (std::holds_alternative<Medium<char8_t>>(prog)){
-			Medium<char8_t> command = language.Lick(std::get<Medium<char8_t>>(prog));
-			std::set<std::u8string> comnames = { u8"write", u8"we"};
-			if ( comnames.contains(std::get<Medium<char8_t>>(ToLower(command))) && (std::get<Medium<char8_t>>(prog)).size() > (command).size())
-				return true;
+	//unsigned long long WriteSyntax(const Token<char8_t>& prog) {
+	//	if (std::holds_alternative<Medium<char8_t>>(prog)) {
+	//		//Medium<char8_t> command = language.Lick(std::get<Medium<char8_t>>(prog));
+	//		auto command = language.Lunch(std::get<Medium<char8_t>>(prog));
+	//		// std::set<std::u8string> comnames = { u8"write", u8"we"};
+	//		if (writecomms.contains(std::get<Medium<char8_t>>(ToLower(command.first))) && (std::get<Medium<char8_t>>(prog)).size() > command.second) {
+	//			Medium<char8_t> remaining = std::get<Medium<char8_t>>(prog.begin() + command.second, prog.end());
+	//			auto remaining = language.Lunch(remaining);
+	//			if (!remaining.first.empty()) {
+	//				if (reinterpret_cast<V>(remaining.first()) != Null) {
+	//					return command.second + remaining.second;
+	//				}
+	//			}
+	//			else if (remaining.first.empty()) {
+	//				throw std::invalid_argument("No value provided to write\n");
+	//			}
+	//		}
+	//	}
+	//	return 0;
+	//}
+
+
+	unsigned long long WriteSyntax(const Token<char8_t>& prog) {
+		if (!std::holds_alternative<Medium<char8_t>>(prog)) return 0;
+
+		const Medium<char8_t>& medium = std::get<Medium<char8_t>>(prog);
+		auto [commandToken, cmdConsumed] = language.Lunch(medium);
+
+		// command must be a write command and there must be data after it
+		if (!writecomms.contains(std::get<Medium<char8_t>>(ToLower(commandToken))) || medium.size() <= cmdConsumed) {
+			if (medium.size() <= cmdConsumed) throw std::invalid_argument("No value provided to write\n");
+			return 0;
 		}
-		return false;
+
+		// remaining buffer after the command
+		Medium<char8_t> remaining(medium.begin() + static_cast<std::ptrdiff_t>(cmdConsumed), medium.end());
+		auto [valueToken, valConsumed] = language.Lunch(remaining);
+
+		if (valueToken.empty()) throw std::invalid_argument("No value provided to write\n");
+
+		bool convertible = false;
+
+		// --- Check convertibility to V without performing the write ---
+		if constexpr (std::is_same_v<V, bool>) {
+			// Use ToLower to canonicalize boolean strings
+			Token<char8_t> vt = valueToken;
+			auto lowered = ToLower(vt);
+			auto lowerMedium = std::get<Medium<char8_t>>(lowered);
+			std::u8string lower_s(lowerMedium.begin(), lowerMedium.end());
+			if (lower_s == u8"true" || lower_s == u8"1" || lower_s == u8"false" || lower_s == u8"0")
+				convertible = true;
+		}
+		else if constexpr (String<V>) {
+			// any token can be treated as a string-like V
+			convertible = true;
+		}
+		else if constexpr (Char<V>) {
+			// single character token OK
+			if (valueToken.size() == 1) convertible = true;
+			else {
+				// numeric-code fallback, parse as signed integer then range-check for V
+				std::string s;
+				s.reserve(valueToken.size());
+				for (char8_t c : valueToken) s.push_back(static_cast<char>(c));
+
+				long long tmp = 0;
+				auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), tmp);
+				if (ec == std::errc{}) {
+					using Target = std::remove_cv_t<V>;
+					if constexpr (std::is_signed_v<Target>) {
+						long long tmin = static_cast<long long>(std::numeric_limits<Target>::min());
+						long long tmax = static_cast<long long>(std::numeric_limits<Target>::max());
+						if (tmp >= tmin && tmp <= tmax) convertible = true;
+					}
+					else {
+						if (tmp >= 0) {
+							unsigned long long utmp = static_cast<unsigned long long>(tmp);
+							unsigned long long umax = static_cast<unsigned long long>(std::numeric_limits<Target>::max());
+							if (utmp <= umax) convertible = true;
+						}
+					}
+				}
+			}
+		}
+		else if constexpr (Arithmetic<V>) {
+			// try parsing into numeric V
+			std::string s;
+			s.reserve(valueToken.size());
+			for (char8_t c : valueToken) s.push_back(static_cast<char>(c));
+			V numericVal = 0;
+			auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), numericVal);
+			if (ec == std::errc{}) convertible = true;
+		}
+		else if constexpr (Defined<V>) {
+			// try constructing V from the token
+			try {
+				std::u8string s(valueToken.begin(), valueToken.end());
+				(void)V(s);
+				convertible = true;
+			}
+			catch (...) {
+				convertible = false;
+			}
+		}
+
+		// return total consumed length (command + value) when convertible, else 0
+		return convertible ? (cmdConsumed + valConsumed) : 0;
 	}
+
 	
 	//bool headSyntax(Medium<char>& prog) {
 	//	if (prog.size() == 1 && prog[0] == HD) return true;
@@ -1076,9 +1187,10 @@ public:
 	}*/
 
 	//friend class AbstractMachine;
-	Medium<V> MakeTape(const unsigned long& k) {
-		if (k >= (sizeof(unsigned long) * 8)) throw std::overflow_error("Tape order too large");
-		std::int64_t size = std::int64_t(1ULL << k);
+	Medium<V> MakeTape(const unsigned char & k) {
+		//if (k >= (sizeof(unsigned) * 8)) throw std::overflow_error("Tape order too large");
+		if (k >= 64) throw std::overflow_error("Tape order too large");
+		std::size_t size = std::size_t(1) << k;
 		if constexpr (requires { typename V::inner_type; }) {
 			using Inner = typename V::inner_type;
 			if constexpr (std::is_arithmetic_v<Inner>) {
@@ -1093,46 +1205,50 @@ public:
 				return Medium<V>(size, Inner{});
 			}
 		}
-		else {
+		else if constexpr (Text<V>) {
 			return Medium<V>(size, V{});
+		}
+		else if constexpr (Arithmetic<V>) {
+			return Medium<V>(V{}, size);
+		}
+
+		else {
+			return Medium<V>(size);
 		}
 	}
 
-	Medium<V> Tape;
 
-	long long head;
-	unsigned order;
 
 	V Read() {
 		std::int64_t zero = static_cast<std::int64_t>(Tape.size()) / 2;
 		std::int64_t idx = head + zero;
-		if (idx < 0 || static_cast<std::int64_t>(idx) >= Tape.size()) {
+		if (idx < 0 || static_cast<std::size_t>(idx) >= Tape.size()) {
 			MoreTape();
 			zero = static_cast<std::int64_t>(Tape.size()) / 2;
 			idx = head + zero;
 		}
 		if constexpr (requires { typename V::inner_type; }) {
-			return V(Tape[static_cast<std::int64_t>(idx)]);
+			return V(Tape[static_cast<std::size_t>(idx)]);
 		}
 	else {
-			return Tape[static_cast<std::int64_t>(idx)];
+			return Tape[static_cast<std::size_t>(idx)];
 		}
 	}
 
 	bool Write(const Program<V>& a) {
 		std::int64_t zero = static_cast<std::int64_t>(Tape.size()) / 2;
 		std::int64_t idx = head + zero;
-		if (idx < 0 || static_cast<std::int64_t>(idx) >= Tape.size()) {
+		if (idx < 0 || static_cast<std::size_t>(idx) >= Tape.size()) {
 			MoreTape();
 			zero = static_cast<std::int64_t>(Tape.size()) / 2;
 			idx = head + zero;
 		}
 		if constexpr (requires { typename V::inner_type; }) {
-			Tape[static_cast<std::int64_t>(idx)] = a.value;
+			Tape[static_cast<std::size_t>(idx)] = a.value;
 			return true;
 		}
 		else {
-			Tape[static_cast<std::int64_t>(idx)] = a;
+			Tape[static_cast<std::size_t>(idx)] = a;
 			return true;
 		}
 		return false;
@@ -1188,23 +1304,24 @@ public:
 		else 
 			return false;
 	}
-	void NewTape(unsigned long long n) {
+	void NewTape(unsigned char n) {
 		Tape = MakeTape(n);
 		//zero = Tape.size() / 2;
 		order = n;
 	}
 
 	bool MoreTape() {
-		if (order + 1 >= (sizeof(unsigned long long) * 8)) {
+		//if (order + 1 >= (sizeof(unsigned char) * 8)) { // max order = 255 for unsigned char
+		if (order + 1 >= 64) { // max order = 63 for unsigned long long, which is the largest we can use for indexing the tape
 			std::cerr << "Max tape order reached\n";
 			return false;
 		}
-		std::int64_t oldSize = Tape.size();
-		std::int64_t newSize = oldSize * 2;
+		std::size_t oldSize = Tape.size();
+		std::size_t newSize = oldSize * 2;
 		Medium<V> VTape = MakeTape(order + 1); // makes newSize
-		std::int64_t oldZero = oldSize / 2;
-		std::int64_t newZero = newSize / 2;
-		for (std::int64_t i = 0; i < oldSize; ++i) {
+		std::size_t oldZero = oldSize / 2;
+		std::size_t newZero = newSize / 2;
+		for (std::size_t i = 0; i < oldSize; ++i) {
 			VTape[i + newZero - oldZero] = Tape[i];
 		}
 		Tape = std::move(VTape);
@@ -1240,7 +1357,7 @@ public:
 		}
 
 		long long newSize = maxIndex - minIndex + 1;
-		unsigned newOrder = static_cast<unsigned>(std::ceil(std::log2(static_cast<double>(newSize))));
+		unsigned char newOrder = static_cast<unsigned>(std::ceil(std::log2(static_cast<double>(newSize))));
 		Medium<V> newTape = MakeTape(newOrder);
 		long long newZero = 1LL << (newOrder - 1);
 
@@ -1286,6 +1403,8 @@ public:
 	Language<char8_t> language;
     std::vector<std::unique_ptr<Resource>> Resources;
 
+	std::vector<Token<char8_t>> ResourceRegistry;
+
 	Substrate<bool>* Tape;
 	States* StateRegister;
 	
@@ -1321,7 +1440,7 @@ public:
 		language.InterpretNullaryVoidFunction(u8"reset", rt, [this]() { this->Reset(); });
 
 		AddResource(u8"tape", std::make_unique<Substrate<bool>>(), TapeComms);
-		AddResource(u8"state", std::make_unique<States>(this), StateComms);
+		AddResource(u8"state", std::make_unique<States>(), StateComms);
 
 		Tape = static_cast<Substrate<bool>*>(Resources[0].get());
 		StateRegister = static_cast<States*>(Resources[1].get());
@@ -1360,48 +1479,149 @@ public:
 		system(command.c_str());
 	}
 
-	std::any Run(const Medium<char8_t>& prog) {
-		if (language.is_well_formed(prog)) {
-			return language.Evaluate(prog).second;
-		}
-		// fallback for default interpretation
-		// because if you invoke a resource first, it's done through the resources' language.
-		for (const auto& res : Resources) {
-			if (res->language.is_well_formed(prog)) {
-				return res->language.Evaluate(prog).second;
+	bool is_resource(const Token<char8_t>& prog) {
+		if (language.is_registered(prog)) {
+			for (const auto& res : ResourceRegistry) {
+				if (res == prog) return true;
 			}
 		}
-		return {};
 	}
 
-	bool ResNameSyntax(const Token<char8_t>& name, const Token<char8_t>& prog, const std::set<Medium<char8_t>>& comnames) {
+	std::vector<std::tuple<Token<char8_t>,std::any, unsigned long long>> Run(const Medium<char8_t>& prog) {
+		//unsigned long long retval = unsigned long long(true);
+
+		//StateRegister->icount = 0;
+
+		std::vector<std::tuple<Token<char8_t>, std::any, unsigned long long>> results;
+		
+		//unsigned long long consumed = 0;
+
+		auto [Concept_Ptr, consumed] = language.is_well_formed(prog);
+
+		//StateRegister->icount = consumed; 
+
+		Medium<char8_t> program{};
+
+		
+
+		if (consumed > 0 && Concept_Ptr != nullptr) {
+			program = Medium<char8_t> (prog.begin(), prog.begin() + consumed);
+			if (is_resource(program)){
+				//Resource* res = std::get<2>(*Concept_Ptr)(prog);
+
+				auto res = language.Evaluate(*Concept_Ptr,program);
+				program = Medium<char8_t>(prog.begin() + consumed, prog.end());
+				auto subresults = RunResource(std::any_cast<Resource*>(res), program);
+
+				results.insert(results.end(), subresults.begin(), subresults.end());
+			}
+			else 
+				results.push_back(std::make_tuple( std::get<0>(*Concept_Ptr), language.Evaluate(*Concept_Ptr,program), consumed ));
+		}
+		else {
+			// fallback for default interpretation
+			// because if you invoke a resource first, it's done through the resources' language.
+			for (const auto& res : Resources) {
+				auto [Concept_Ptr, consumed] = res->language.is_well_formed(prog);
+				if (consumed > 0) {
+					program = Medium<char8_t>(prog.begin(), prog.begin() + consumed);
+					results.push_back(std::make_tuple(std::get<0>(*Concept_Ptr), res->language.Evaluate(*Concept_Ptr, program), consumed));
+					break;
+				}
+			}
+		}
+
+		if (consumed > 0 && consumed < prog.size()) {
+			program = Medium<char8_t>(prog.begin() + consumed, prog.end());
+			auto subresults = Run(program);
+			results.insert(results.end(), subresults.begin(), subresults.end());
+		}
+		consumed = 0;
+		for (const auto& [concepts, value, length] : results) {
+			consumed += length;
+		}
+		if (consumed < prog.size()) {
+			program = Medium<char8_t>(prog.begin() + consumed, prog.end());
+			if (!str_predicate(std::isspace, program)) {
+				throw std::invalid_argument("Unconsumed input remaining after evaluation\n");
+				return {};
+			}
+		}
+
+		return results;
+	}
+
+	std::vector<std::tuple<Token<char8_t>, std::any, unsigned long long>> RunResource(Resource* res, const Medium<char8_t>& prog) {
+
+		//unsigned long long retval = unsigned long long(true);
+
+		//StateRegister->icount = 0;
+
+		std::vector<std::tuple<Token<char8_t>, std::any, unsigned long long>> results;
+
+		//unsigned long long consumed = 0;
+
+		auto [Concept_Ptr, consumed] = res->language.is_well_formed(prog);
+
+
+		//StateRegister->icount = consumed; 
+
+		Medium<char8_t> program{};
+
+
+		if (consumed > 0 && Concept_Ptr != nullptr) {
+			program = Medium<char8_t>(prog.begin(), prog.begin() + consumed);
+			results.push_back(std::make_tuple(std::get<0>(*Concept_Ptr), res->language.Evaluate(*Concept_Ptr, program), consumed));
+		}
+
+		if (consumed > 0 && consumed < prog.size()) {
+			program = Medium<char8_t>(prog.begin() + consumed, prog.end());
+			auto subresults = Run(program);
+			results.insert(results.end(), subresults.begin(), subresults.end());
+		}
+		consumed = 0;
+		for (const auto& [concepts, value, length] : results) {
+			consumed += length;
+		}
+		if (consumed < prog.size()) {
+			program = Medium<char8_t>(prog.begin() + consumed, prog.end());
+			if (!str_predicate(std::isspace, program)) {
+				throw std::invalid_argument("Unconsumed input remaining after evaluation\n");
+				return {};
+			}
+		}
+
+		return results;
+	}
+
+	unsigned long long ResNameSyntax(const Token<char8_t>& name, const Token<char8_t>& prog, const std::set<Medium<char8_t>>& comnames) {
 		if (std::holds_alternative<Program<char8_t>>(name) || std::holds_alternative<Program<char8_t>>(prog))
 			return false;
 		
 		if (std::holds_alternative<Medium<char8_t>>(name) && std::holds_alternative<Medium<char8_t>>(prog)){
-			if (!language.is_well_formed(name)) {
+			
+			if (language.is_well_formed(name).second != 0 ) {
 				Medium<char8_t> command = language.Lick(std::get<Medium<char8_t>>(prog));
 				if (!command.empty() && comnames.contains(std::get<Medium<char8_t>>(ToLower(command)))){
-					return true;
+					return command.size();
 				}
-				return false;
+				return 0;
 			}
 			throw std::invalid_argument("Resource name must be a word without an interpretation\n");
-			return false;
+			return 0;
 		}
-		return false;
+		return 0;
 	}
 
 	std::any ResNameSemantic(const Token<char8_t>& prog, Resource* res) {
-		Medium<char8_t> program = std::get<Medium<char8_t>>(prog);
-		language.Munch(program);
-		return res->language.Evaluate(program);
+		return res;
 	}
 
 	void AddResource(const Token<char8_t>& name, std::unique_ptr<Resource> res, std::set<Medium<char8_t>> comnames ) {
 		if (language.is_word(name) && !language.is_registered(name)) {
 			Resources.push_back(std::move(res));
 			Resource* resPtr = res.get();
+			ResourceRegistry.push_back(name);
 			language.Interpret(
 				std::set<Program<char8_t>>{},
 				name,
@@ -1417,8 +1637,10 @@ public:
 		Tape->NewTape(Tape->order);
 
 		StateRegister->states.clear();
+		StateRegister->instnum.clear();
 		StateRegister->previous.clear();
-		StateRegister->Load(u8"start nothing");
+
+		StateRegister->Load (u8"nothing");
 	}
 	void Start(unsigned long n) {
 		Tape->head = StateRegister->state = StateRegister->icount = 0;
@@ -1426,8 +1648,9 @@ public:
 		Tape->NewTape(n);
 
 		StateRegister->states.clear();
+		StateRegister->instnum.clear();
 		StateRegister->previous.clear();
-		StateRegister->Load(u8"start nothing");
+		StateRegister->Load (u8"ng");
 	}
 
 	std::any StartSemantic(Medium<char8_t> program) {
@@ -1481,7 +1704,7 @@ public:
 		std::cout << "Head: " << Tape->head << std::endl;
 		std::cout << "State: " << StateRegister->state << std::endl;
 		std::cout << "Count: " << StateRegister->icount << std::endl;
-		std::cout << "Trail: ";
+		std::cout << "Trail: " ;
 
 		for (auto a : StateRegister->previous) {
 			std::cout << a << " ";

@@ -9,9 +9,9 @@
 int main()
 {
 
-    std::cout << "This is Abstract Machine!\n";
-    std::cout << "Copyright © 2026 Guillermo M. Dávila Andino\n";
-    std::cout << "All rights reserved.\n";
+    std::print( "This is Abstract Machine!\n");
+    std::print( "Copyright © 2026 Guillermo M. Dávila Andino\n");
+    std::print( "All rights reserved.\n");
 
     //AbstractMachine AM1;
 
@@ -20,7 +20,9 @@ int main()
 
     AbstractMachine a;
     
-    auto [tok, result] = a.language.Evaluate(u8"5628");
+	auto [Concept_Ptr, consumed] = a.language.is_well_formed(u8"5628");
+    auto result = a.language.Evaluate(*Concept_Ptr, u8"5628");
+	auto tok = std::get<0>(*Concept_Ptr);
     
     if (result.has_value() && result.type() == typeid(Token<char8_t>)) {
         std::cout << "Actual Stored Type: " << result.type().name() << "\n";
@@ -41,9 +43,9 @@ int main()
 
     ProgramFile<char8_t> pf;
     pf.push_back(u8"start 16");
-    pf.push_back(u8"write 1");
+
     pf.push_back(u8"left");
-    pf.push_back(u8"write 1");
+
     pf.push_back(u8"left");
     pf.push_back(u8"write 1");
     pf.push_back(u8"end");
