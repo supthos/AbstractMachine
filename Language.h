@@ -436,7 +436,9 @@ class Language {
 		bool ret = true;
 		if (std::holds_alternative<Medium<V>>(token)){
 			for (const Program<V>& symbol : std::get<Medium<V>>(token)) {
-				ret = ret && A.insert(symbol).second;
+				if (!A.contains(symbol)) {
+					ret = ret && A.insert(symbol).second;
+				}
 			}
 			return ret;
 		}
@@ -446,7 +448,9 @@ class Language {
 	bool AddSymbols (const Alphabet& a){
 		bool ret = true;
 		for (Program<V> symbol: a){
-			ret = ret && A.insert(symbol).second;
+			if (!A.contains(symbol)) {
+				ret = ret && A.insert(symbol).second;
+			}
 		}
 		return ret;
 	}
@@ -483,10 +487,11 @@ class Language {
 	// This function returns true if its syntax is recognized from within the Concepts
 
 	std::pair<const Concept*, unsigned long long> has_interpretation(const Token<V>& token) {
-		for (const Concept& c : I) {
-			unsigned long long consumed = std::get<1>(c)(token);
-			if (consumed > 0) return {&c, consumed};
+		for (auto it = I.rbegin(); it != I.rend(); it++) {
+			unsigned long long consumed = std::get<1>(*it)(token);
+			if (consumed > 0) return { &(*it), consumed };
 		}
+
 		return { nullptr, 0 };
 	}
 
@@ -605,11 +610,26 @@ class Language {
 	// 	}
 	// }
 
+	//void InterpretPredicate(int(*predicate)(int), const Token<V>& name) {
+	//	Interpret(
+	//		GetCharacterSet(predicate), 
+	//		name, 
+	//		[predicate](const Token<V>& prog) { return str_predicate(predicate, prog); },
+	//		[this](const Token<V>& prog) { return this->IdentitySemantic(prog); }
+	//	);
+	//}
+
 	void InterpretPredicate(int(*predicate)(int), const Token<V>& name) {
 		Interpret(
-			GetCharacterSet(predicate), 
-			name, 
-			[predicate](const Token<V>& prog) { return str_predicate(predicate, prog); },
+			GetCharacterSet(predicate),
+			name,
+			[predicate](const Token<V>& prog) -> unsigned long long {
+				if (str_predicate(predicate, prog)) {
+					if (std::holds_alternative<Program<V>>(prog)) return 1;
+					return std::get<Medium<V>>(prog).size();
+				}
+				return 0;
+			},
 			[this](const Token<V>& prog) { return this->IdentitySemantic(prog); }
 		);
 	}
@@ -726,7 +746,8 @@ class Language {
 class Resource {
 public:
     virtual ~Resource() = default;
-    Language<char8_t> language;
+	std::shared_ptr<Language<char8_t>> language;
+    //Language<char8_t> language;
     //std::any resource;
 };
 
@@ -745,15 +766,16 @@ public:
 		SE, LD, UL, CL
 	};*/
 
-	States() {
+	States(std::shared_ptr<Language<char8_t>> lang) {
+		language = lang;
 
-		language.AddCharacterInterpretations();
-		language.InterpretMediumFunction(u8"load", ld, [this](const Medium<char8_t>& p) { return this->Load(p); });
-		language.InterpretMediumFunction(u8"unload", ud, [this](const Medium<char8_t>& p) { return this->Unload(p); });
+		//language->AddCharacterInterpretations();
+		language->InterpretMediumFunction(u8"load", ld, [this](const Medium<char8_t>& p) { return this->Load(p); });
+		language->InterpretMediumFunction(u8"unload", ud, [this](const Medium<char8_t>& p) { return this->Unload(p); });
 
 
-		language.InterpretMediumFunction(u8"accepting", ag, [this](const Medium<char8_t>& p) { return this->AcceptingSemantic(p); });
-		language.InterpretMediumFunction(u8"state", se, [this](const Medium<char8_t>& p) { return this->State(); });
+		language->InterpretMediumFunction(u8"accepting", ag, [this](const Medium<char8_t>& p) { return this->AcceptingSemantic(p); });
+		language->InterpretMediumFunction(u8"state", se, [this](const Medium<char8_t>& p) { return this->State(); });
 	}
 
 
@@ -783,24 +805,24 @@ public:
 		Medium<char8_t> name;
 		unsigned long long new_state;
 
-		if (at.contains(std::get<Medium<char8_t>>(ToLower(language.Lick(prog))))) {
+		if (at.contains(std::get<Medium<char8_t>>(ToLower(language->Lick(prog))))) {
 			kind = StateKind::AG;
-			language.Munch(prog); // Remove "accept"
+			language->Munch(prog); // Remove "accept"
 		}
 
 		if (!prog.empty()){
-			if(ne.contains(std::get<Medium<char8_t>>(ToLower(language.Lick(prog))))) {
-				language.Munch(prog); // Remove "name"	
+			if(ne.contains(std::get<Medium<char8_t>>(ToLower(language->Lick(prog))))) {
+				language->Munch(prog); // Remove "name"	
 				if (!prog.empty()){
-					name = language.Munch(prog);
+					name = language->Munch(prog);
 					if (!name.empty() && str_predicate(std::isalpha, name)) {
 						new_state = hasher(name);
 					} 
 				}
 			}
-			else if (st.contains(std::get<Medium<char8_t>>(ToLower(language.Lick(prog))))) {
+			else if (st.contains(std::get<Medium<char8_t>>(ToLower(language->Lick(prog))))) {
 				new_state = 0;
-				language.Munch(prog); // Remove "start"
+				//language->Munch(prog); // Remove "start"
 				if (!prog.empty()) {
 					states[new_state] = prog; // Store the remaining program as the state representation
 				}
@@ -833,14 +855,14 @@ public:
 
 	unsigned long Unload(Medium<char8_t> program) {
 		Medium<char8_t> prog = program;
-		language.Munch(prog); // Remove the command (e.g., "unload") to get the state identifier
+		language->Munch(prog); // Remove the command (e.g., "unload") to get the state identifier
 		unsigned long s ;
 
 		if (prog.empty()) {
 			s = state;
 		}
 		else {
-			prog = language.Munch(prog); // Get the next token which should be the state identifier
+			prog = language->Munch(prog); // Get the next token which should be the state identifier
 			if (!prog.empty()) {
 				if( str_predicate(std::isalpha, prog)) {
 					s = hasher(prog);
@@ -873,9 +895,9 @@ public:
 
 	std::any AcceptingSemantic(Medium<char8_t> program) {
 		Medium<char8_t> prog = program;
-		language.Munch(prog); // Remove the command (e.g., "accepting") to get the state identifier
+		language->Munch(prog); // Remove the command (e.g., "accepting") to get the state identifier
 		if (!prog.empty()) {
-			prog = language.Munch(prog); // Get the next token which should be the state identifier
+			prog = language->Munch(prog); // Get the next token which should be the state identifier
 			if (!prog.empty()) {
 				if( str_predicate(std::isalpha, prog)) {
 					unsigned long s = hasher(prog);
@@ -925,12 +947,14 @@ public:
 	unsigned char order;
 
 
-	Substrate() {
+	Substrate(std::shared_ptr<Language<char8_t>> lang) {
+		language = lang;
+
 		order = 16;
 		head = 0;
 		Tape = MakeTape(order);
 
-		language.AddCharacterInterpretations();
+		//language.AddCharacterInterpretations();
 		/*language.Interpret(Digits, "digits", &Substrate<char>::DigitsSyntax, &Substrate<char>::DigitsSemantic);
 		language.Interpret({}, "read", &Substrate<char>::ReadSyntax, &Substrate<char>::ReadSemantic);
 		language.Interpret({}, "write", &Substrate<char>::writeSyntax, &Substrate<char>::writeSemantic);
@@ -947,22 +971,22 @@ public:
 		// language.Interpret(u8"head", Head());
 		// language.Interpret(u8"left", Left());
 		// language.Interpret(u8"right", Right());
-		language.InterpretNullaryFunction(u8"read", readcomms, [this]() { return Read(); });	
-		language.InterpretNullaryFunction(u8"head", headcomms, [this]() { return Head(); });
-		language.InterpretNullaryFunction(u8"left", leftcomms, [this]() { return Left(); });
-		language.InterpretNullaryFunction(u8"right", rightcomms, [this]() { return Right(); });
+		language->InterpretNullaryFunction(u8"read", readcomms, [this]() { return Read(); });	
+		language->InterpretNullaryFunction(u8"head", headcomms, [this]() { return Head(); });
+		language->InterpretNullaryFunction(u8"left", leftcomms, [this]() { return Left(); });
+		language->InterpretNullaryFunction(u8"right", rightcomms, [this]() { return Right(); });
 
-		language.InterpretNullaryVoidFunction(u8"shrink", shrinkcomms, [this]() { Shrink(); });
+		language->InterpretNullaryVoidFunction(u8"shrink", shrinkcomms, [this]() { Shrink(); });
 
-		language.Interpret(
+		language->Interpret(
 			std::set<char8_t>{},
 			u8"write",
 			[this](const Token<char8_t>& prog) { return this->WriteSyntax(prog); },
 			[this](const Token<char8_t>& prog) { return this->WriteSemantic(prog); }
 		);
 
-		language.InterpretMediumFunction(u8"goto", gotocomms, [this](const Medium<char8_t>& prog) { return this->GoTo(std::stoll(std::string(prog.begin(), prog.end()))); });
-		language.InterpretMediumFunction(u8"move", movecomms, [this](const Medium<char8_t>& prog) { return this->Move(std::stoll(std::string(prog.begin(), prog.end()))); });
+		language->InterpretMediumFunction(u8"goto", gotocomms, [this](const Medium<char8_t>& prog) { return this->GoTo(std::stoll(std::string(prog.begin(), prog.end()))); });
+		language->InterpretMediumFunction(u8"move", movecomms, [this](const Medium<char8_t>& prog) { return this->Move(std::stoll(std::string(prog.begin(), prog.end()))); });
 	}
 
 
@@ -1000,8 +1024,8 @@ public:
 
 	std::any WriteSemantic(const Token<char8_t>& prog) {
 		Medium<char8_t> program = std::get<Medium<char8_t>>(prog);
-		language.Munch(program); // Remove "write" command
-		Medium<char8_t> valStr = language.Munch(program); // Get the data to write
+		language->Munch(program); // Remove "write" command
+		Medium<char8_t> valStr = language->Munch(program); // Get the data to write
 
 		// Case 0: Tape stores bool values
 		if constexpr (std::is_same_v<V, bool>) {
@@ -1092,17 +1116,17 @@ public:
 		if (!std::holds_alternative<Medium<char8_t>>(prog)) return 0;
 
 		const Medium<char8_t>& medium = std::get<Medium<char8_t>>(prog);
-		auto [commandToken, cmdConsumed] = language.Lunch(medium);
+		auto [commandToken, cmdConsumed] = language->Lunch(medium);
 
 		// command must be a write command and there must be data after it
 		if (!writecomms.contains(std::get<Medium<char8_t>>(ToLower(commandToken))) || medium.size() <= cmdConsumed) {
-			if (medium.size() <= cmdConsumed) throw std::invalid_argument("No value provided to write\n");
+			if (medium.size() <= cmdConsumed) //throw std::invalid_argument("No value provided to write\n");
 			return 0;
 		}
 
 		// remaining buffer after the command
 		Medium<char8_t> remaining(medium.begin() + static_cast<std::ptrdiff_t>(cmdConsumed), medium.end());
-		auto [valueToken, valConsumed] = language.Lunch(remaining);
+		auto [valueToken, valConsumed] = language->Lunch(remaining);
 
 		if (valueToken.empty()) throw std::invalid_argument("No value provided to write\n");
 
@@ -1400,7 +1424,8 @@ bool Inclusion (std::set<unsigned char>A, std::set<unsigned char>B){
 class AbstractMachine {
 public:
 	// friend class States;
-	Language<char8_t> language;
+	//Language<char8_t> language;
+	std::shared_ptr<Language<char8_t>> language;
     std::vector<std::unique_ptr<Resource>> Resources;
 
 	std::vector<Token<char8_t>> ResourceRegistry;
@@ -1421,26 +1446,27 @@ public:
 
 
 	void Initialize() {
-		language.AddCharacterInterpretations();
-		language.AddTypeInterpretations();
+		language = std::make_shared<Language<char8_t>>();
+		language->AddCharacterInterpretations();
+		language->AddTypeInterpretations();
 
-		language.InterpretMediumFunction(u8"run", RunComms, [this](const Medium<char8_t>& prog) { return this->Run(prog); });
+		language->InterpretMediumFunction(u8"run", RunComms, [this](const Medium<char8_t>& prog) { return this->Run(prog); });
 
-		language.InterpretMediumFunction(u8"system",sm, [this](const Medium<char8_t>& p) { 
+		language->InterpretMediumFunction(u8"system",sm, [this](const Medium<char8_t>& p) { 
 			std::string command(p.begin(), p.end());
 			this->System(command); 
 			return std::any{}; // Void return
 		});
 
-		language.InterpretNullaryVoidFunction(u8"nothing", ng, [this]() { this->Nothing(); });	
-		language.InterpretMediumFunction(u8"start", st, [this](const Medium<char8_t>& prog) { return this->StartSemantic(prog); });
-		// language.InterpretMediumFunction(u8"start", st, [this](const Medium<char8_t>& prog) { return this->StartSemantic(prog); });
-		language.InterpretNullaryVoidFunction(u8"end", ed, [this]() { this->End(); });
-		language.InterpretMediumFunction(u8"call", cl, [this](const Medium<char8_t>& prog) { return this->CallSemantic(prog); });
-		language.InterpretNullaryVoidFunction(u8"reset", rt, [this]() { this->Reset(); });
+		language->InterpretNullaryVoidFunction(u8"nothing", ng, [this]() { this->Nothing(); });	
+		language->InterpretMediumFunction(u8"start", st, [this](const Medium<char8_t>& prog) { return this->StartSemantic(prog); });
+		// language->InterpretMediumFunction(u8"start", st, [this](const Medium<char8_t>& prog) { return this->StartSemantic(prog); });
+		language->InterpretNullaryVoidFunction(u8"end", ed, [this]() { this->End(); });
+		language->InterpretMediumFunction(u8"call", cl, [this](const Medium<char8_t>& prog) { return this->CallSemantic(prog); });
+		language->InterpretNullaryVoidFunction(u8"reset", rt, [this]() { this->Reset(); });
 
-		AddResource(u8"tape", std::make_unique<Substrate<bool>>(), TapeComms);
-		AddResource(u8"state", std::make_unique<States>(), StateComms);
+		AddResource(u8"tape", std::make_unique<Substrate<bool>>(language));
+		AddResource(u8"states", std::make_unique<States>(language));
 
 		Tape = static_cast<Substrate<bool>*>(Resources[0].get());
 		StateRegister = static_cast<States*>(Resources[1].get());
@@ -1480,11 +1506,41 @@ public:
 	}
 
 	bool is_resource(const Token<char8_t>& prog) {
-		if (language.is_registered(prog)) {
+		if (language->is_registered(prog)) {
 			for (const auto& res : ResourceRegistry) {
 				if (res == prog) return true;
 			}
 		}
+	}
+
+	ProgramFile<char8_t> ChopLine(Medium<char8_t> prog) {
+		ProgramFile<char8_t> pf;
+		Medium<char8_t> line;
+		Medium<char8_t> inst;
+		Medium<char8_t> program = prog;
+		bool registered = false;
+		inst = language->Munch(program);
+		if (language->is_registered(inst)) {
+			line = inst;
+			while (!program.empty()) {
+				inst = language->Munch(program);
+				registered = language->is_registered(inst);
+				if (!registered && !inst.empty()) {
+					line = line + u8" " + inst;
+				}
+				else {
+					registered = false;
+					pf.push_back(line);
+					line.clear();
+					if (!inst.empty())
+						line = inst;
+				}
+			}
+			if (!line.empty()) {
+				pf.push_back(line);
+			}
+		}
+		return pf;
 	}
 
 	std::vector<std::tuple<Token<char8_t>,std::any, unsigned long long>> Run(const Medium<char8_t>& prog) {
@@ -1493,122 +1549,54 @@ public:
 		//StateRegister->icount = 0;
 
 		std::vector<std::tuple<Token<char8_t>, std::any, unsigned long long>> results;
+		Medium<char8_t> program{};
 		
 		//unsigned long long consumed = 0;
 
-		auto [Concept_Ptr, consumed] = language.is_well_formed(prog);
+		ProgramFile<char8_t> pf = ChopLine(prog);
+		for (auto line : pf) {
+			auto [Concept_Ptr, consumed] = language->is_well_formed(line);
 
-		//StateRegister->icount = consumed; 
+			if (consumed > 0 && Concept_Ptr != nullptr) {
+				program = Medium<char8_t>(line.begin(), line.begin() + consumed);
 
-		Medium<char8_t> program{};
+				results.push_back(std::make_tuple(std::get<0>(*Concept_Ptr), language->Evaluate(*Concept_Ptr, program), consumed));
+			}
 
-		
-
-		if (consumed > 0 && Concept_Ptr != nullptr) {
-			program = Medium<char8_t> (prog.begin(), prog.begin() + consumed);
-			if (is_resource(program)){
-				//Resource* res = std::get<2>(*Concept_Ptr)(prog);
-
-				auto res = language.Evaluate(*Concept_Ptr,program);
-				program = Medium<char8_t>(prog.begin() + consumed, prog.end());
-				auto subresults = RunResource(std::any_cast<Resource*>(res), program);
-
+			if (consumed > 0 && consumed < line.size()) {
+				program = Medium<char8_t>(line.begin() + consumed, line.end());
+				auto subresults = Run(program);
 				results.insert(results.end(), subresults.begin(), subresults.end());
 			}
-			else 
-				results.push_back(std::make_tuple( std::get<0>(*Concept_Ptr), language.Evaluate(*Concept_Ptr,program), consumed ));
-		}
-		else {
-			// fallback for default interpretation
-			// because if you invoke a resource first, it's done through the resources' language.
-			for (const auto& res : Resources) {
-				auto [Concept_Ptr, consumed] = res->language.is_well_formed(prog);
-				if (consumed > 0) {
-					program = Medium<char8_t>(prog.begin(), prog.begin() + consumed);
-					results.push_back(std::make_tuple(std::get<0>(*Concept_Ptr), res->language.Evaluate(*Concept_Ptr, program), consumed));
-					break;
+			consumed = 0;
+			for (const auto& [concepts, value, length] : results) {
+				consumed += length;
+			}
+			if (consumed < line.size()) {
+				program = Medium<char8_t>(line.begin() + consumed, line.end());
+				if (!str_predicate(std::isspace, program)) {
+					throw std::invalid_argument("Unconsumed input remaining after evaluation\n");
+					return {};
 				}
 			}
 		}
 
-		if (consumed > 0 && consumed < prog.size()) {
-			program = Medium<char8_t>(prog.begin() + consumed, prog.end());
-			auto subresults = Run(program);
-			results.insert(results.end(), subresults.begin(), subresults.end());
-		}
-		consumed = 0;
-		for (const auto& [concepts, value, length] : results) {
-			consumed += length;
-		}
-		if (consumed < prog.size()) {
-			program = Medium<char8_t>(prog.begin() + consumed, prog.end());
-			if (!str_predicate(std::isspace, program)) {
-				throw std::invalid_argument("Unconsumed input remaining after evaluation\n");
-				return {};
-			}
-		}
+
 
 		return results;
 	}
 
-	std::vector<std::tuple<Token<char8_t>, std::any, unsigned long long>> RunResource(Resource* res, const Medium<char8_t>& prog) {
 
-		//unsigned long long retval = unsigned long long(true);
-
-		//StateRegister->icount = 0;
-
-		std::vector<std::tuple<Token<char8_t>, std::any, unsigned long long>> results;
-
-		//unsigned long long consumed = 0;
-
-		auto [Concept_Ptr, consumed] = res->language.is_well_formed(prog);
-
-
-		//StateRegister->icount = consumed; 
-
-		Medium<char8_t> program{};
-
-
-		if (consumed > 0 && Concept_Ptr != nullptr) {
-			program = Medium<char8_t>(prog.begin(), prog.begin() + consumed);
-			results.push_back(std::make_tuple(std::get<0>(*Concept_Ptr), res->language.Evaluate(*Concept_Ptr, program), consumed));
-		}
-
-		if (consumed > 0 && consumed < prog.size()) {
-			program = Medium<char8_t>(prog.begin() + consumed, prog.end());
-			auto subresults = Run(program);
-			results.insert(results.end(), subresults.begin(), subresults.end());
-		}
-		consumed = 0;
-		for (const auto& [concepts, value, length] : results) {
-			consumed += length;
-		}
-		if (consumed < prog.size()) {
-			program = Medium<char8_t>(prog.begin() + consumed, prog.end());
-			if (!str_predicate(std::isspace, program)) {
-				throw std::invalid_argument("Unconsumed input remaining after evaluation\n");
-				return {};
-			}
-		}
-
-		return results;
-	}
-
-	unsigned long long ResNameSyntax(const Token<char8_t>& name, const Token<char8_t>& prog, const std::set<Medium<char8_t>>& comnames) {
-		if (std::holds_alternative<Program<char8_t>>(name) || std::holds_alternative<Program<char8_t>>(prog))
+	unsigned long long ResNameSyntax(const Token<char8_t>& prog, const std::set<Medium<char8_t>>& comnames) {
+		if (std::holds_alternative<Program<char8_t>>(prog))
 			return false;
 		
-		if (std::holds_alternative<Medium<char8_t>>(name) && std::holds_alternative<Medium<char8_t>>(prog)){
-			
-			if (language.is_well_formed(name).second != 0 ) {
-				Medium<char8_t> command = language.Lick(std::get<Medium<char8_t>>(prog));
-				if (!command.empty() && comnames.contains(std::get<Medium<char8_t>>(ToLower(command)))){
-					return command.size();
-				}
-				return 0;
+		if (std::holds_alternative<Medium<char8_t>>(prog)){
+
+			Medium<char8_t> command = language->Lick(std::get<Medium<char8_t>>(prog));
+			if (!command.empty() && comnames.contains(std::get<Medium<char8_t>>(ToLower(command)))){
+				return command.size();
 			}
-			throw std::invalid_argument("Resource name must be a word without an interpretation\n");
-			return 0;
 		}
 		return 0;
 	}
@@ -1617,17 +1605,42 @@ public:
 		return res;
 	}
 
-	void AddResource(const Token<char8_t>& name, std::unique_ptr<Resource> res, std::set<Medium<char8_t>> comnames ) {
-		if (language.is_word(name) && !language.is_registered(name)) {
+	void AddResource(const Token<char8_t>& name, std::unique_ptr<Resource> res ) {
+		if (language->is_word(name) && !language->is_registered(name)) {
 			Resources.push_back(std::move(res));
-			Resource* resPtr = res.get();
+			auto resPtr = Resources.back().get();
 			ResourceRegistry.push_back(name);
-			language.Interpret(
-				std::set<Program<char8_t>>{},
-				name,
-				[this, name, comnames](const Token<char8_t>& prog) { return this->ResNameSyntax(name, prog, comnames); },
-				[this, name, resPtr](const Token<char8_t>& prog) { return this->ResNameSemantic(prog, resPtr); }
-			);
+		}
+	}
+
+	void RemoveResource(const Token<char8_t>& name) {
+		
+		if (is_resource(name)) {
+			auto [Concept_Ptr, consumed] = language->is_well_formed(name);
+			if (!Concept_Ptr) return;
+
+			//std::unique_ptr<Resource> Res;
+			auto res = std::any_cast<Resource*>(language->Evaluate(*Concept_Ptr, name));
+
+			for (auto it = Resources.begin(); it != Resources.end(); it++) {
+				if ((*it).get() == res) {
+					//Res = std::move(*it);
+					Resources.erase(it);
+					break;
+				}
+			}
+			for (auto it = ResourceRegistry.begin(); it != ResourceRegistry.end(); it++) {
+				if ((*it) == name) {
+					ResourceRegistry.erase(it);
+					break;
+				}
+			}
+			for (auto it = language->I.begin(); it != language->I.end(); it++) {
+				if (std::get<0>(*it) == std::get<0>(*Concept_Ptr)) {
+					(language->I).erase(it);
+					break;
+				}
+			}
 		}
 	}
 
@@ -1655,9 +1668,9 @@ public:
 
 	std::any StartSemantic(Medium<char8_t> program) {
 		Medium<char8_t> prog = program;
-		language.Munch(prog); // Remove "start" command
+		language->Munch(prog); // Remove "start" command
 		if (!prog.empty()) {
-			prog = language.Munch(prog); // Get the next token which should be the tape order
+			prog = language->Munch(prog); // Get the next token which should be the tape order
 			if (!prog.empty()) {
 				if( str_predicate(std::isdigit, prog)) {
 					unsigned long n = std::stoull(std::string(prog.begin(), prog.end()));
@@ -1677,20 +1690,20 @@ public:
 		std::string lt = "", rt = "";
 		long long block = Tape->head / 64;
 		for (unsigned i = 0; i < 64; i++) {
-			if (Tape->Tape[(zero / 64 + block - 1) * 64 + i + 1] == false) lt += "0";
+			if (Tape->Tape[(zero / 64 + block - 1) * 64 + i ] == false) lt += "0";
 			else lt += "1";
-			if (Tape->Tape[(zero / 64 + block + 1) * 64 - i] == false) rt += "0";
+			if (Tape->Tape[(zero / 64 + block + 1) * 64 - i -1] == false) rt += "0";
 			else rt += "1";
 		}
 
 		if (Tape->head >= 0) {
-			for (int i = 0; i < 63 - (Tape->head % 64); i++) {
+			for (int i = 0; i < 63 - ((Tape->head ) % 64); i++) {
 				mess += " ";
 			}
 			mess += "_";
 		}
 		else if (Tape->head < 0) {
-			for (int i = -1; i > -64 - ((Tape->head + 1) % 64); i--) {
+			for (int i = -1; i > -64 - ((Tape->head + 1 ) % 64); i--) {
 				mess += " ";
 			}
 			mess += "^";
@@ -1738,9 +1751,9 @@ public:
 
 	std::any CallSemantic(const Medium<char8_t>& program) {
 		Medium<char8_t> prog = program;
-		language.Munch(prog); 
+		language->Munch(prog); 
 		if (!prog.empty()) {
-			prog = language.Munch(prog);
+			prog = language->Munch(prog);
 			if (!prog.empty()) {
 				if(str_predicate(std::isalpha, prog)) {
 					return Call(StateRegister->hasher(prog));
@@ -1769,7 +1782,7 @@ public:
 			if (StateRegister->states.contains(st)) {
 				results.push_back(Run((std::get<Medium<char8_t>>(StateRegister->states[st]))));
 			}
-			 else {
+			else {
 				results.push_back(false);
 			}
 		}
