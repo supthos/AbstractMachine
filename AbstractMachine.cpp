@@ -1,10 +1,14 @@
 // AbstractMachine.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 
-#include <iostream>
-#include "Language.h"
+//#include <iostream>
+//#include "Language.h"
+#include "AbstractMachine.h"
+#include "Interpreter.h"
 #include <print>
-#include <format>
+//#include <format>
+
+
 
 int main()
 {
@@ -13,50 +17,59 @@ int main()
     std::print( "Copyright © 2026 Guillermo M. Dávila Andino\n");
     std::print( "All rights reserved.\n");
 
-    //AbstractMachine AM1;
 
+    //char32_t testChar = U'Σ'; // Greek Sigma
 
-    //Substrate<char8_t> a;
+    //std::cout << "Testing character U+03A3..." << std::endl;
+    //if (isalpha(testChar)) {
+    //    std::cout << "The character is Alphabetic in locale" << std::endl;
+    //}
+    //
+    //testChar = U'S'; // Greek Sigma
+
+    //std::cout << "Testing character U+03A3..." << std::endl;
+    //if (isalpha(testChar)) {
+    //    std::cout << "The character is Alphabetic in locale" << std::endl;
+    //}
 
     AbstractMachine a;
-    
-	auto [Concept_Ptr, consumed] = a.language->is_well_formed(u8"5628");
-    auto result = a.language->Evaluate(*Concept_Ptr, u8"5628");
-	auto tok = std::get<0>(*Concept_Ptr);
-    
-    if (result.has_value() && result.type() == typeid(Token<char8_t>)) {
-        std::cout << "Actual Stored Type: " << result.type().name() << "\n";
-        // Safe to cast now
-        std::cout << "Token: " << tok << ", Value: " << std::any_cast<Token<char8_t>>(result) << "\n";
-    }
-    else {
-        // This block handles the case where Evaluation failed or type is wrong
-        std::cout << "Evaluation failed or returned empty/wrong std::any.\n";
-        // Add more diagnostics if needed
-        if (result.has_value()) {
-            std::cout << "Error: Expected Token<char8_t>, but std::any holds type: " << result.type().name() << "\n";
-        }
-        else {
-            std::cout << "Error: std::any is empty (no matching language rule found).\n";
-        }
-    }
 
-	Medium<char8_t> start_command = u8"start 16 end left end left end write 1 end";
+    //auto [Concept_Ptr, consumed] = a.language->is_well_formed(u8"5628");
+    //auto result = a.language->Evaluate(*Concept_Ptr, u8"5628");
+    //auto tok = std::get<0>(*Concept_Ptr);
 
-    //ProgramFile<char8_t> pf;
+    //if (result.has_value() && result.type() == typeid(Token<char8_t>)) {
+    //    std::cout << "Actual Stored Type: " << result.type().name() << "\n";
+    //    // Safe to cast now
+    //    std::cout << "Token: " << tok << ", Value: " << std::any_cast<Token<char8_t>>(result) << "\n";
+    //}
+    //else {
+    //    // This block handles the case where Evaluation failed or type is wrong
+    //    std::cout << "Evaluation failed or returned empty/wrong std::any.\n";
+    //    // Add more diagnostics if needed
+    //    if (result.has_value()) {
+    //        std::cout << "Error: Expected Token<char8_t>, but std::any holds type: " << result.type().name() << "\n";
+    //    }
+    //    else {
+    //        std::cout << "Error: std::any is empty (no matching language rule found).\n";
+    //    }
+    //}
 
-    //pf.push_back(u8"left");
-
-    //pf.push_back(u8"left");
-    //pf.push_back(u8"write 1");
-    //pf.push_back(u8"end");
+	//Medium<char8_t> start_command = u8"start 16 end left end left end write 1 end";
 
 
-    try {
-        a.LoadAndRun(start_command);
-    } catch (const std::exception& e) {
-        std::cerr << "Aborted with error: " << e.what() << std::endl;
-    }
+
+ //   try {
+ //       a.LoadAndRun(start_command);
+ //   } catch (const std::exception& e) {
+ //       std::cerr << "Aborted with error: " << e.what() << std::endl;
+ //   }
+
+
+
+    Interpreter I(&a);
+
+    I.REPL();
 
 }
 
