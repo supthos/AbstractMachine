@@ -1,5 +1,5 @@
-// AbstractMachine.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
+//  AbstractMachine.cpp : This file contains the 'main' function. Program execution begins and ends there.
+//  Copyright © 2026 Guillermo M. Dávila Andino
 
 #include "AbstractMachine.h"
 #include "Interpreter.h"

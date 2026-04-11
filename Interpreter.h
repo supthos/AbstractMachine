@@ -1,10 +1,11 @@
+//	Interpreter.h : This file defines the Interpreter class, which provides a Read-Eval-Print Loop (REPL
+//  Copyright © 2026 Guillermo M. Dávila Andino
+
 #pragma once
 
 #include <Print>
 #include <iostream>
 #include "Language.h"
-
-
 
 class Interpreter {
 public:

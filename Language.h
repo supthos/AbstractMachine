@@ -1,15 +1,15 @@
+//	Language.h : This file defines the Language class, which represents a formal language defined by an alphabet and a set of interpretations (concepts). It provides methods to add symbols, check if a program is well-formed, and evaluate programs based on the defined syntax and semantics. The Language class is designed to be flexible and extensible, allowing for the definition of various types of languages and their associated concepts.
+//  Copyright © 2026 Guillermo M. Dávila Andino
+
 #pragma once
 
 #include <iostream>
 #include <set>
 #include <any>
 #include <string>
-//#include <map>
 #include <memory>
 #include <vector>
 #include <functional>
-
-//#include <cmath>
 #include <valarray>
 #include <concepts>
 #include <typeinfo>
@@ -20,7 +20,6 @@
 #include <iterator>
 #include <climits> // for UCHAR_MAX
 #include <locale>
-//#include <charconv>
 //#include <string_view>
 #include <unordered_map>
 

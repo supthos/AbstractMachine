@@ -1,3 +1,6 @@
+//  AbstractMachine.h : This file defines the AbstractMachine class, which represents a Turing-complete computational model. The AbstractMachine has a tape (modeled by the Substrate resource) and a state register (modeled by the States resource). It can interpret and execute programs written in its language, which is defined by the Language class. The AbstractMachine can be extended with additional resources and commands as needed.
+//	Copyright © 2026 Guillermo M. Dávila Andino
+
 #pragma once
 
 #include "Language.h"
