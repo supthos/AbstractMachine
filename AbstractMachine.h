@@ -15,18 +15,16 @@ public:
 
 class States : public Resource {
 public:
-
+	// command names
 	std::set<Medium<char8_t>> ld = { u8"load", u8"ld" };
 	std::set<Medium<char8_t>> ud = { u8"unload", u8"ud" };
 	std::set<Medium<char8_t>> se = { u8"state", u8"se" };
 	std::set<Medium<char8_t>> at = { u8"accept", u8"at" };
-	std::set<Medium<char8_t>> ne = { u8"name", u8"ne" };
 
+	// identifiers or parameters
+	std::set<Medium<char8_t>> ne = { u8"name", u8"ne" };
 	std::set<Medium<char8_t>> ag = { u8"accepting", u8"ag" };
 	std::set<Medium<char8_t>> st = { u8"start", u8"st" };
-	/*enum class Symbols: char {
-		SE, LD, UL, CL
-	};*/
 
 	States(std::shared_ptr<Language<char8_t>> lang) {
 		name = u8"States";
@@ -61,6 +59,14 @@ public:
 	std::set<unsigned long long> accepting{};
 
 	unsigned long long State() const { return state; }
+
+	unsigned long long Instruction() const { return icount; }
+	unsigned long long PreviousInstruction() const { return instnum.back(); }
+	unsigned long long PreviousState() const { return previous.back(); }
+
+	// return true if in accepting state
+	bool Accepting() { return accepting.contains(state); }
+	bool Accepting(unsigned long st) { return  accepting.contains(st); }
 
 	// Load returns a pair of the state kind and the new state number. 
 	std::pair<StateKind, unsigned long long> Load(const Token<char8_t>& program) {
@@ -157,9 +163,7 @@ public:
 	}
 
 
-	// return true if in accepting state
-	bool Accepting() { return accepting.contains(state); }
-	bool Accepting(unsigned long st) { return  accepting.contains(st); }
+
 
 	std::any AcceptingSemantic(Medium<char8_t> program) {
 		Medium<char8_t> prog = program;
@@ -244,6 +248,8 @@ public:
 		language->InterpretMediumFunction(u8"goto", gotocomms, [this](const Medium<char8_t>& prog) { return this->GoTo(std::stoll(std::string(prog.begin(), prog.end()))); }, name);
 		language->InterpretMediumFunction(u8"move", movecomms, [this](const Medium<char8_t>& prog) { return this->Move(std::stoll(std::string(prog.begin(), prog.end()))); }, name);
 	}
+
+	long long Head() const { return head; }
 
 	std::any WriteSemantic(const Token<char8_t>& prog) {
 		Medium<char8_t> program = std::get<Medium<char8_t>>(prog);
@@ -462,7 +468,6 @@ public:
 		//return false;
 	}
 
-	long long Head() const { return head; }
 
 	bool Left() {
 		if (--head < -(1LL << (order - 1))) {
@@ -605,7 +610,7 @@ public:
 	std::set<Medium<char8_t>> st = { u8"start", u8"st" };
 	std::set<Medium<char8_t>> cl = { u8"call", u8"cl" };
 	std::set<Medium<char8_t>> ed = { u8"end", u8"ed" };
-	std::set<Medium<char8_t>> rt = { u8"reset", u8"rt" };
+	std::set<Medium<char8_t>> rt = { u8"reset", u8"re" };
 
 	Medium<char8_t> name = u8"Abstract Machine";
 
@@ -921,7 +926,7 @@ public:
 			<< "States: " << StateRegister->states.size() << std::endl;
 	}
 
-	std::any Call(unsigned long state) {
+	std::any Call(unsigned long long state) {
 		std::any retval = false;
 		if (StateRegister->states.contains(state)) {
 			StateRegister->previous.push_back(StateRegister->state);
