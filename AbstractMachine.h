@@ -68,8 +68,8 @@ public:
 	unsigned long long PreviousState() const { return previous.back(); }
 
 	// return true if in accepting state
-	bool Accepting() { return accepting.contains(state); }
-	bool Accepting(unsigned long st) { return  accepting.contains(st); }
+	bool Accepting() const { return accepting.contains(state); }
+	bool Accepting(unsigned long st) const { return  accepting.contains(st); }
 
 	// Load returns a pair of the state kind and the new state number. 
 	std::pair<StateKind, unsigned long long> Load(const Token<char8_t>& program) {
@@ -323,8 +323,8 @@ public:
 		auto [commandToken, cmdConsumed] = language->Lunch(medium);
 
 		// command must be a write command and there must be data after it
-		if (!writecomms.contains(std::get<Medium<char8_t>>(ToLower(commandToken))) || medium.size() <= cmdConsumed) {
-			if (medium.size() <= cmdConsumed) //throw std::invalid_argument("No value provided to write\n");
+		if (!writecomms.contains(std::get<Medium<char8_t>>(ToLower(commandToken))) ) {
+			//if (medium.size() <= cmdConsumed) //throw std::invalid_argument("No value provided to write\n");
 				return 0;
 		}
 
@@ -341,7 +341,7 @@ public:
 			// Use ToLower to canonicalize boolean strings
 			Token<char8_t> vt = valueToken;
 			auto lowered = ToLower(vt);
-			auto lowerMedium = std::get<Medium<char8_t>>(lowered);
+			auto& lowerMedium = std::get<Medium<char8_t>>(lowered);
 			std::u8string lower_s(lowerMedium.begin(), lowerMedium.end());
 			if (lower_s == u8"true" || lower_s == u8"1" || lower_s == u8"false" || lower_s == u8"0")
 				convertible = true;
@@ -614,8 +614,11 @@ public:
 	std::set<Medium<char8_t>> cl = { u8"call", u8"cl" };
 	std::set<Medium<char8_t>> ed = { u8"end", u8"ed" };
 	std::set<Medium<char8_t>> rt = { u8"reset", u8"re" };
+	std::set<Medium<char8_t>> bh = { u8"branch", u8"bh" };
 
 	Medium<char8_t> name = u8"Abstract Machine";
+
+	typedef bool TapeSymbol;
 
 	void Initialize() {
 		language = std::make_shared<Language<char8_t>>();
@@ -638,21 +641,30 @@ public:
 		language->InterpretMediumFunction(u8"call", cl, [this](const Medium<char8_t>& prog) { return this->CallSemantic(prog); }, name);
 		language->InterpretNullaryVoidFunction(u8"reset", rt, [this]() { this->Reset(); }, name);
 
+		language->Interpret(
+			std::set<Program<char8_t>>{},
+			u8"branch",
+			bh,
+			[this](const Token<char8_t>& prog) { return this->BranchSyntax<TapeSymbol>(prog); },
+			[this](const Token<char8_t>& prog) { return this->BranchSemantic<TapeSymbol>(prog); },
+			name
+		);
+
 		AddResource(std::make_unique<Substrate<bool>>(language));
 		AddResource(std::make_unique<States>(language));
 
-		Tape = static_cast<Substrate<bool>*>(Resources[0].get());
+		Tape = static_cast<Substrate<TapeSymbol>*>(Resources[0].get());
 		StateRegister = static_cast<States*>(Resources[1].get());
 	}
 
 	AbstractMachine() {
 		Initialize();
-		Tape->NewTape(16);
+		Start();
 	}
 
 	AbstractMachine(const unsigned long& tape_order) {
 		Initialize();
-		Tape->NewTape(tape_order);
+		Start(tape_order);
 	}
 
 	AbstractMachine(const Token<char8_t>& program) : AbstractMachine() {
@@ -680,7 +692,7 @@ public:
 		system(command.c_str());
 	}
 
-	bool is_resource(const Medium<char8_t>& prog) {
+	bool is_resource(const Medium<char8_t>& prog) const {
 		if (language->is_registered(prog, u8"Resource")) {
 			auto [Concept_Ptr, consumed, cntxt] = language->is_well_formed(prog, u8"Resource");
 			if (std::get<Medium<char8_t>>(std::get<0>(*Concept_Ptr)) == prog) {
@@ -690,7 +702,7 @@ public:
 		return false;
 	}
 
-	ProgramFile<char8_t> ChopLine2(Medium<char8_t> prog) {
+	ProgramFile<char8_t> ChopLine2(Medium<char8_t> prog) const {
 		ProgramFile<char8_t> pf;
 		Medium<char8_t> line;
 		Medium<char8_t> inst;
@@ -740,7 +752,7 @@ public:
 		Medium<char8_t> program{};
 
 		ProgramFile<char8_t> pf = ChopLine2(prog);
-		for (auto line : pf) {
+		for (auto& line : pf) {
 
 			auto contexts = language->is_well_formed_context(line);
 
@@ -849,7 +861,7 @@ public:
 		StateRegister->instnum.clear();
 		StateRegister->previous.clear();
 
-		StateRegister->Load(u8"nothing");
+		StateRegister->Load(u8"load name null nothing");
 	}
 	void Start(unsigned long n) {
 		Tape->head = StateRegister->state = StateRegister->icount = 0;
@@ -859,7 +871,7 @@ public:
 		StateRegister->states.clear();
 		StateRegister->instnum.clear();
 		StateRegister->previous.clear();
-		StateRegister->Load(u8"ng");
+		StateRegister->Load(u8"load name null nothing");
 	}
 
 	std::any StartSemantic(Medium<char8_t> program) {
@@ -962,6 +974,79 @@ public:
 					//return Call(std::stoull(std::string(prog.begin(), prog.end())));
 				}
 			}
+		}
+		return false;
+	}
+
+	// In AbstractMachine, before BranchSyntax
+	template<Value V>
+	static V ParseValue(const Medium<char8_t>& token) {
+		if constexpr (Defined<V>) {
+			// Defined types must be constructible from u8string (per concept)
+			return V(token);
+		}
+		else if constexpr (std::same_as<V, bool>) {
+			return token == u8"true" || token == u8"1";
+		}
+		else if constexpr (std::is_integral_v<V>) {
+			std::string s(reinterpret_cast<const char*>(token.data()), token.size());
+			return static_cast<V>(std::stoll(s));
+		}
+		else if constexpr (std::is_floating_point_v<V>) {
+			std::string s(reinterpret_cast<const char*>(token.data()), token.size());
+			return static_cast<V>(std::stod(s));
+		}
+		else if constexpr (Char<V>) {
+			return token.empty() ? V{} : static_cast<V>(token[0]);
+		}
+		else {
+			return V{};
+		}
+	}
+
+	template<Value V>
+	unsigned long long BranchSyntax(const Token<char8_t>& prog) {
+		if (!std::holds_alternative<Medium<char8_t>>(prog)) return 0;
+		Medium<char8_t> program = std::get<Medium<char8_t>>(prog);
+		if (bh.contains(std::get<Medium<char8_t>>(ToLower(language->Munch(program))))) {
+			if (!program.empty()) {
+				language->Munch(program);
+				if (!program.empty() ) {
+					Medium<char8_t> truebranch = language->Munch(program);
+					if (!program.empty() && (str_predicate(isalpha, truebranch) || str_predicate(isdigit, truebranch))) {
+						Medium<char8_t> falsebranch = language->Munch(program);
+						if ((str_predicate(isalpha, falsebranch) || str_predicate(isdigit, falsebranch))) {
+							return std::get<Medium<char8_t>>(prog).size() - program.size() ;
+						}
+					}
+					
+				}
+			}
+		}
+		return 0;
+	}
+
+	template<Value V>
+	std::any BranchSemantic(const Token<char8_t>& program) {
+		Medium<char8_t> prog = std::get<Medium<char8_t>>(program);
+		language->Munch(prog);
+		if (!prog.empty()) {
+			V cond = ParseValue<V>(language->Munch(prog));
+			bool conditionMet = false;
+
+			if (cond == Tape->Read()) conditionMet = true;
+			else conditionMet = false;
+
+			Medium<char8_t> truebranch = language->Munch(prog);
+			Medium<char8_t> falsebranch = language->Munch(prog);
+
+			if (conditionMet) {
+				return CallSemantic(u8"call " + truebranch);
+			}
+			else {
+				return CallSemantic(u8"call " + falsebranch);
+			}
+
 		}
 		return false;
 	}

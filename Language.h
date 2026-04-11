@@ -640,6 +640,33 @@ public:
 		return false;
 	}
 
+	bool Interpret(const Alphabet& a, const Token<V>& t, const std::set<Medium<V>>& comms, Syntax syn, Semantic sem, const Medium<V> context) {
+		bool s = false;
+		for (const auto& n : comms) {
+			s = s || (is_registered(n, context));
+		}
+
+		if (s) {
+			std::cerr << "Can't register names";
+			return false;
+		}
+
+		s = Interpret(
+			a,
+			t,
+			syn,
+			sem,
+			context
+		);
+
+		if (s) {
+			RegisteredNames[context].push_back(comms);
+			return true;
+		}
+
+		else return false;
+	}
+
 	// Interpret method overload for Value-returning functions with no arguments.
 	bool Interpret(const Token<V>& t, std::function <std::any ()> f, Medium<V> context) {
 		return Interpret(
@@ -649,6 +676,7 @@ public:
 			[this, f](const Token<V>& prog) {return this->NullarySemantic(f); },
 			context);
 	}
+
 	bool InterpretNullaryFunction(const Token<V>& t, const std::set<Medium<V>>& comms, std::function<std::any ()> f, Medium<V> context) {
 		bool s = false;
 		for (const auto& n : comms) {
