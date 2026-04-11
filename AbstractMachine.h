@@ -127,10 +127,10 @@ public:
 		return std::make_pair(kind, new_state);
 	}
 
-	unsigned long Unload(Medium<char8_t> program) {
+	unsigned long long Unload(Medium<char8_t> program) {
 		Medium<char8_t> prog = program;
 		language->Munch(prog); // Remove the command (e.g., "unload") to get the state identifier
-		unsigned long s;
+		unsigned long long s;
 
 		if (prog.empty()) {
 			s = state;
@@ -243,6 +243,7 @@ public:
 		language->Interpret(
 			std::set<char8_t>{},
 			u8"write",
+			writecomms,
 			[this](const Token<char8_t>& prog) { return this->WriteSyntax(prog); },
 			[this](const Token<char8_t>& prog) { return this->WriteSemantic(prog); },
 			name

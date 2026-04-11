@@ -314,16 +314,16 @@ public:
 	Medium<V> Munch(Medium<V>& prog) {
 		Medium<V> program{};
 		size_t i = 0;
-		while (i < prog.size() && std::isspace(static_cast<unsigned char>(prog[i]))) {
+		while (i < prog.size() && isspace((prog[i]))) {
 			++i;
 		}
 
-		while (i < prog.size() && !std::isspace(static_cast<unsigned char>(prog[i]))) {
+		while (i < prog.size() && !isspace((prog[i]))) {
 			program += prog[i];
 			++i;
 		}
 
-		while (i < prog.size() && std::isspace(static_cast<unsigned char>(prog[i]))) {
+		while (i < prog.size() && isspace((prog[i]))) {
 			++i;
 		}
 		prog.erase(0, i);
@@ -334,16 +334,16 @@ public:
 	std::pair<Medium<V>, unsigned long long> Lunch(const Medium<V>& prog) {
 		Medium<V> program{};
 		size_t i = 0;
-		while (i < prog.size() && std::isspace(static_cast<unsigned char>(prog[i]))) {
+		while (i < prog.size() && isspace((prog[i]))) {
 			++i;
 		}
 
-		while (i < prog.size() && !std::isspace(static_cast<unsigned char>(prog[i]))) {
+		while (i < prog.size() && !isspace((prog[i]))) {
 			program += prog[i];
 			++i;
 		}
 
-		while (i < prog.size() && std::isspace(static_cast<unsigned char>(prog[i]))) {
+		while (i < prog.size() && isspace((prog[i]))) {
 			++i;
 		}
 		return std::make_pair(program, i);
@@ -356,12 +356,12 @@ public:
 		size_t i = 0;
 		//unsigned long long offset = 0;
 		while (i<prog.size()){
-			while (i < prog.size() && std::isspace(static_cast<unsigned char>(prog[i]))) {
+			while (i < prog.size() && isspace((prog[i]))) {
 				++i;
 			}
 
-			while (i < prog.size() && !std::isspace(static_cast<unsigned char>(prog[i]))) {
-				if (!std::ispunct(static_cast<unsigned char>(prog[i]))) {
+			while (i < prog.size() && !isspace((prog[i]))) {
+				if (!ispunct((prog[i]))) {
 					if (program.first.empty()) {
 						program.second = i; // Set the starting index of the token
 					}
@@ -397,12 +397,12 @@ public:
 	Program<V> Nibble (Medium<V> & prog){
 		Program<V> bite;
 		size_t i = 0;
-		while (i < prog.size() && std::isspace(static_cast<unsigned char>(prog[i]))) {
+		while (i < prog.size() && isspace((prog[i]))) {
 			++i;
 		}
 		bite = prog[i];
 		++i;
-		while (i < prog.size() && std::isspace(static_cast<unsigned char>(prog[i]))) {
+		while (i < prog.size() && isspace((prog[i]))) {
 			++i;
 		}
 		prog.erase(0, i);
@@ -413,11 +413,11 @@ public:
 	Medium<V> Lick (const Medium<V>& prog){
 		Medium<V> program{};
 		size_t i = 0;
-		while (i < prog.size() && std::isspace(static_cast<unsigned char>(prog[i]))) {
+		while (i < prog.size() && isspace((prog[i]))) {
 			++i;
 		}
 
-		while (i < prog.size() && !std::isspace(static_cast<unsigned char>(prog[i]))) {
+		while (i < prog.size() && !isspace((prog[i]))) {
 			program += prog[i];
 			++i;
 		}
@@ -427,7 +427,7 @@ public:
 	// This function copies the first bite of a program.
 	Program<V> Lick_V (const Medium<V> & prog){
 		size_t i = 0;
-		while (i < prog.size() && std::isspace(static_cast<unsigned char>(prog[i]))) {
+		while (i < prog.size() && isspace(prog[i])) {
 			++i;
 		}
 		return prog[i]; 
