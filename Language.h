@@ -861,7 +861,10 @@ public:
 	bool FloatPredicate(const Medium<V>& prog) {
 		if (prog.empty()) return false;
 
-		Medium<V> program = Lick(prog);
+		Medium<V> iprog = prog;
+		Medium<V> program = Munch(iprog);
+
+		if (!iprog.empty()) return false;
 
 		auto tokens = ChopLine(program);
 
@@ -889,11 +892,14 @@ public:
 
 		return false;
 	}
-
+	
 	bool IntegerPredicate(const Medium<V>& prog) {
 		if (prog.empty()) return false;
 
-		Medium<V> program = Lick(prog);
+		Medium<V> iprog = prog;
+		Medium<V> program = Munch(iprog);
+
+		if (!iprog.empty()) return false;
 
 		auto tokens = ChopLine(program);
 
@@ -911,29 +917,6 @@ public:
 
 		return false;
 	}
-
-	//bool NumberPredicate2(const Medium<V>& prog) {
-	//	if (prog.empty()) return false;
-
-	//	Medium<V> program = prog;
-	//	if (Nibble(program) == u8'-' || Nibble(program) == u8'+') {
-	//		if (program.empty()) return false;
-	//	}
-	//	while (!program.empty()) {
-	//		Program<V> bite = Nibble(program);
-	//		if ()
-
-	//		if (token.size() != 1 || !isdigit(static_cast<char32_t>(token[0]))) {
-	//			return false;
-	//		}
-	//	}
-	//	for (const V& c : prog) {
-	//		if (!isdigit(static_cast<char32_t>(c))) {
-	//			return false;
-	//		}
-	//	}
-	//	return true;
-	//}
 
 };
 
