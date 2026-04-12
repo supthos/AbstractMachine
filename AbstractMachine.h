@@ -35,8 +35,15 @@ public:
 		language = lang;
 
 		//language->AddCharacterInterpretations();
-		language->InterpretIntegerArgumentMediumFunction(u8"load", ld, [this](const Medium<char8_t>& p) { return this->Load(p); }, name);
-		language->InterpretIntegerArgumentMediumFunction(u8"unload", ud, [this](const Medium<char8_t>& p) { return this->Unload(p); }, name);
+		language->InterpretMediumFunction(u8"load", ld, [this](const Medium<char8_t>& p) { return this->Load(p); }, name);
+		language->Interpret(
+			std::set<Program<char8_t>>{},
+			u8"unload",
+			ud,
+			[this](const Token<char8_t>& prog) { return this->UnloadSyntax(prog); },
+			[this](const Token<char8_t>& prog) { return this->Unload(std::get<Medium<char8_t>>(prog)); },
+			name
+		);
 
 
 		language->InterpretMediumFunction(u8"accepting", ag, [this](const Medium<char8_t>& p) { return this->AcceptingSemantic(p); }, name);
@@ -127,6 +134,20 @@ public:
 		return std::make_pair(kind, new_state);
 	}
 
+	unsigned long long UnloadSyntax(const Token<char8_t>& program) {
+		Medium<char8_t> prog = std::get<Medium<char8_t>>(program);
+		if (ud.contains(language->Munch(prog)) && !prog.empty()) {
+			Medium<char8_t> arg = language->Munch(prog); // Get the next token which should be the state identifier
+			if (!prog.empty()) {
+				if (str_predicate(isalpha, prog) || str_predicate(isdigit, prog)) {
+					return std::get<Medium<char8_t>>(program).size() - prog.size(); 
+				}
+			}
+			else return std::get<Medium<char8_t>>(program).size(); 
+		}
+		return 0; // Invalid state identifier
+	}
+
 	unsigned long long Unload(Medium<char8_t> program) {
 		Medium<char8_t> prog = program;
 		language->Munch(prog); // Remove the command (e.g., "unload") to get the state identifier
@@ -175,7 +196,7 @@ public:
 			prog = language->Munch(prog); // Get the next token which should be the state identifier
 			if (!prog.empty()) {
 				if (str_predicate(isalpha, prog)) {
-					unsigned long s = hasher(prog);
+					unsigned long long s = hasher(prog);
 					return Accepting(s);
 				}
 				else if (str_predicate(isdigit, prog)) {
@@ -190,7 +211,7 @@ public:
 	}
 
 	// Mark a state as accepting
-	bool Accept(unsigned long st) {
+	bool Accept(unsigned long long st) {
 		if (states.contains(st)) {
 			accepting.insert(st);
 			return true;
@@ -1120,14 +1141,14 @@ public:
 	}
 
 	std::any LoadAndRun(Token<char8_t> program) {
-		unsigned long ld = StateRegister->Load(program).second;
+		unsigned long long ld = StateRegister->Load(program).second;
 		if (StateRegister->states.contains(ld)) {
 			return Run((std::get<Medium<char8_t>>(StateRegister->states[ld])));
 		}
 		else return false;
 	}
 	std::any LoadAndRun(ProgramFile<char8_t> file) {
-		std::vector<unsigned long> StateStack;
+		std::vector<unsigned long long> StateStack;
 		std::vector<std::any> results;
 		for (Medium<char8_t> line : file) {
 			StateStack.push_back(StateRegister->Load(line).second);

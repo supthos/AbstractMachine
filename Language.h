@@ -166,7 +166,7 @@ using Token = std::variant<Medium<V>, Program<V>>;
 
 
 template <Text V>
-std::ostream& operator<<(std::ostream& os, const Token<V>& tok) {
+inline std::ostream& operator<<(std::ostream& os, const Token<V>& tok) {
 	/*if (std::holds_alternative<Program<V>>(tok))
     	return os << static_cast<char>(std::get<Program<V>>(tok));
 	if (std::holds_alternative<Medium<V>>(tok))
@@ -858,22 +858,22 @@ public:
 };
 
 // Character Set operations
-auto Intersection (std::set<unsigned char>&A, std::set<unsigned char>&B, std::set<unsigned char>&Dest){
+inline auto Intersection (std::set<unsigned char>&A, std::set<unsigned char>&B, std::set<unsigned char>&Dest){
 	return std::set_intersection(A.begin(), A.end(),
 							B.begin(), B.end(),
 							std::inserter(Dest, Dest.begin()));
 }
-auto Union (std::set<unsigned char>&A, std::set<unsigned char>&B, std::set<unsigned char>&Dest){
+inline auto Union (std::set<unsigned char>&A, std::set<unsigned char>&B, std::set<unsigned char>&Dest){
 	return std::set_union(A.begin(), A.end(),
 							B.begin(), B.end(),
 							std::inserter(Dest, Dest.begin()));
 }
-auto Difference (std::set<unsigned char>&A, std::set<unsigned char>&B, std::set<unsigned char>&Dest){
+inline auto Difference (std::set<unsigned char>&A, std::set<unsigned char>&B, std::set<unsigned char>&Dest){
 	return std::set_difference(A.begin(), A.end(),
 							B.begin(), B.end(),
 							std::inserter(Dest, Dest.begin()));
 }
-bool Inclusion (std::set<unsigned char>&A, std::set<unsigned char>&B){
+inline bool Inclusion (std::set<unsigned char>&A, std::set<unsigned char>&B){
 	return std::includes(A.begin(), A.end(),
 							B.begin(), B.end());
 }
