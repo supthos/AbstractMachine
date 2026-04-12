@@ -23,47 +23,47 @@
 //#include <string_view>
 #include <unordered_map>
 
-std::locale currentLocale = std::locale("en_US.utf8");
+inline std::locale currentLocale = std::locale("en_US.utf8");
 
-bool isspace(char32_t c) {
+inline bool isspace(char32_t c) {
 	return std::use_facet<std::ctype<char32_t>>(currentLocale).is(std::ctype_base::space, c);
 }
-bool isblank(char32_t c) {
+inline bool isblank(char32_t c) {
 	return std::use_facet<std::ctype<char32_t>>(currentLocale).is(std::ctype_base::blank, c);
 }
-bool iscntrl(char32_t c) {
+inline bool iscntrl(char32_t c) {
 	return std::use_facet<std::ctype<char32_t>>(currentLocale).is(std::ctype_base::cntrl, c);
 }
-bool isupper(char32_t c) {
+inline bool isupper(char32_t c) {
 	return std::use_facet<std::ctype<char32_t>>(currentLocale).is(std::ctype_base::upper, c);
 }
-bool islower(char32_t c) {
+inline bool islower(char32_t c) {
 	return std::use_facet<std::ctype<char32_t>>(currentLocale).is(std::ctype_base::lower, c);
 }
-bool isalpha(char32_t c) {
+inline bool isalpha(char32_t c) {
 	return std::use_facet<std::ctype<char32_t>>(currentLocale).is(std::ctype_base::alpha, c);
 }
-bool isdigit(char32_t c) {
+inline bool isdigit(char32_t c) {
 	return std::use_facet<std::ctype<char32_t>>(currentLocale).is(std::ctype_base::digit, c);
 }
-bool ispunct(char32_t c) {
+inline bool ispunct(char32_t c) {
 	return std::use_facet<std::ctype<char32_t>>(currentLocale).is(std::ctype_base::punct, c);
 }
-bool isxdigit(char32_t c) {
+inline bool isxdigit(char32_t c) {
 	return std::use_facet<std::ctype<char32_t>>(currentLocale).is(std::ctype_base::xdigit, c);
 }
-bool isprint(char32_t c) {
+inline bool isprint(char32_t c) {
 	return std::use_facet<std::ctype<char32_t>>(currentLocale).is(std::ctype_base::print, c);
 }
-bool isalnum(char32_t c) {
+inline bool isalnum(char32_t c) {
 	return std::use_facet<std::ctype<char32_t>>(currentLocale).is(std::ctype_base::alnum, c);
 }
-bool isgraph(char32_t c) {
+inline bool isgraph(char32_t c) {
 	return std::use_facet<std::ctype<char32_t>>(currentLocale).is(std::ctype_base::graph, c);
 }
 
 // Overload >> to support u8string
-std::istream& operator>>(std::istream& is, std::u8string& u8s) {
+inline std::istream& operator>>(std::istream& is, std::u8string& u8s) {
 	std::string temp;
 	if (is >> temp) {
 		u8s.assign(reinterpret_cast<const char8_t*>(temp.data()), temp.size());
@@ -72,13 +72,13 @@ std::istream& operator>>(std::istream& is, std::u8string& u8s) {
 }
 
 // Teach cout how to handle u8string
-std::ostream& operator<<(std::ostream& os, const std::u8string& u8s) {
+inline std::ostream& operator<<(std::ostream& os, const std::u8string& u8s) {
 	// We "re-interpret" the memory as standard char so cout accepts it
 	return os << reinterpret_cast<const char*>(u8s.c_str());
 }
 
 // Custom getline for std::u8string
-std::istream& getline(std::istream& is, std::u8string& u8s, char delim = '\n') {
+inline std::istream& getline(std::istream& is, std::u8string& u8s, char delim = '\n') {
 	std::string temp;
 	if (std::getline(is, temp, delim)) {
 		u8s.assign(reinterpret_cast<const char8_t*>(temp.data()), temp.size());
@@ -181,7 +181,7 @@ std::ostream& operator<<(std::ostream& os, const Token<V>& tok) {
 	return os;
 }
 
-Token<char8_t> ToLower (Token<char8_t> text){
+inline Token<char8_t> ToLower (Token<char8_t> text){
 	auto& f = std::use_facet<std::ctype<char32_t>>(currentLocale);
 
 	if (std::holds_alternative<Program<char8_t>>(text)){
@@ -199,7 +199,7 @@ Token<char8_t> ToLower (Token<char8_t> text){
 	return {};
 }
 
-bool str_predicate(bool(*predicate)(char32_t), Token<char8_t> token){
+inline bool str_predicate(bool(*predicate)(char32_t), Token<char8_t> token){
 	if (std::holds_alternative<Program<char8_t>>(token)){
 		return predicate(static_cast<unsigned char>(std::get<Program<char8_t>>(token))) ;
 	}
@@ -215,7 +215,7 @@ bool str_predicate(bool(*predicate)(char32_t), Token<char8_t> token){
 	return false;
 }
 
-std::set<char8_t> GetCharacterSet(bool (*predicate)(char32_t)) {
+inline std::set<char8_t> GetCharacterSet(bool (*predicate)(char32_t)) {
     std::set<char8_t> result;
     //for (long int i = 0; i <= 1114111; ++i) {
     for (long int i = 0; i <= UCHAR_MAX; ++i) {

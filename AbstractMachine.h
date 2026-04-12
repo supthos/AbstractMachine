@@ -611,7 +611,7 @@ public:
 	std::set<Medium<char8_t>> TapeComms = { u8"tape", u8"te" };
 	std::set<Medium<char8_t>> StateComms = { u8"state", u8"se" };
 
-	std::set<Medium<char8_t>> sm = { u8"system", u8"sm" };
+	//std::set<Medium<char8_t>> sm = { u8"system", u8"sm" };
 	std::set<Medium<char8_t>> ng = { u8"nothing", u8"ng" };
 	std::set<Medium<char8_t>> st = { u8"start", u8"st" };
 	std::set<Medium<char8_t>> cl = { u8"call", u8"cl" };
@@ -630,12 +630,12 @@ public:
 
 		language->InterpretMediumFunction(u8"run", RunComms, [this](const Medium<char8_t>& prog) { return this->Run(prog); }, name);
 
-		language->InterpretMediumFunction(u8"system", sm, [this](const Medium<char8_t>& p) {
+		/*language->InterpretMediumFunction(u8"system", sm, [this](const Medium<char8_t>& p) {
 			std::string command(p.begin(), p.end());
 			this->System(command);
 			return std::any{};},
 			name
-		);
+		);*/
 
 		language->InterpretNullaryVoidFunction(u8"nothing", ng, [this]() { this->Nothing(); }, name);
 
@@ -703,14 +703,11 @@ public:
 		LoadAndRun(file);
 	}
 
-	//~AbstractMachine() {};
-
 	virtual ~AbstractMachine() = default;
 
-
-	void System(std::string command) {
+	/*void System(std::string command) {
 		system(command.c_str());
-	}
+	}*/
 
 	bool is_resource(const Medium<char8_t>& prog) const {
 		if (language->is_registered(prog, u8"Resource")) {
@@ -873,6 +870,15 @@ public:
 	}
 
 	void Start() {
+		if (!is_resource(u8"Tape")) {
+			AddResource(std::make_unique<Substrate<bool>>(language));
+			Tape = static_cast<Substrate<TapeSymbol>*>(Resources.back().get());
+		}
+		if (!is_resource(u8"StateRegister")) {
+			AddResource(std::make_unique<States>(language));
+			StateRegister = static_cast<States*>(Resources.back().get());
+		}
+
 		Tape->head = StateRegister->state = StateRegister->icount = 0;
 
 		Tape->NewTape(Tape->order);
@@ -884,6 +890,15 @@ public:
 		StateRegister->Load(u8"load name null nothing");
 	}
 	void Start(unsigned long n) {
+		if (!is_resource(u8"Tape")) {
+			AddResource(std::make_unique<Substrate<bool>>(language));
+			Tape = static_cast<Substrate<TapeSymbol>*>(Resources.back().get());
+		}
+		if (!is_resource(u8"StateRegister")) {
+			AddResource(std::make_unique<States>(language));
+			StateRegister = static_cast<States*>(Resources.back().get());
+		}
+
 		Tape->head = StateRegister->state = StateRegister->icount = 0;
 
 		Tape->NewTape(n);
