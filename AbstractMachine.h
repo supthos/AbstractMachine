@@ -35,12 +35,12 @@ public:
 		language = lang;
 
 		//language->AddCharacterInterpretations();
-		language->InterpretMediumFunction(u8"load", ld, [this](const Medium<char8_t>& p) { return this->Load(p); }, name);
-		language->InterpretMediumFunction(u8"unload", ud, [this](const Medium<char8_t>& p) { return this->Unload(p); }, name);
+		language->InterpretIntegerArgumentMediumFunction(u8"load", ld, [this](const Medium<char8_t>& p) { return this->Load(p); }, name);
+		language->InterpretIntegerArgumentMediumFunction(u8"unload", ud, [this](const Medium<char8_t>& p) { return this->Unload(p); }, name);
 
 
 		language->InterpretMediumFunction(u8"accepting", ag, [this](const Medium<char8_t>& p) { return this->AcceptingSemantic(p); }, name);
-		language->InterpretMediumFunction(u8"state", se, [this](const Medium<char8_t>& p) { return this->State(); }, name);
+		language->InterpretNullaryFunction(u8"state", se, [this]() { return this->State(); }, name);
 	}
 
 
@@ -249,8 +249,8 @@ public:
 			name
 		);
 
-		language->InterpretMediumFunction(u8"goto", gotocomms, [this](const Medium<char8_t>& prog) { return this->GoTo(std::stoll(std::string(prog.begin(), prog.end()))); }, name);
-		language->InterpretMediumFunction(u8"move", movecomms, [this](const Medium<char8_t>& prog) { return this->Move(std::stoll(std::string(prog.begin(), prog.end()))); }, name);
+		language->InterpretIntegerArgumentLongLongFunction(u8"goto", gotocomms, [this](const long long& prog) { return this->GoTo(prog); }, name);
+		language->InterpretIntegerArgumentLongLongFunction(u8"move", movecomms, [this](const long long& prog) { return this->Move(prog); }, name);
 	}
 
 	long long Head() const { return head; }
@@ -496,6 +496,8 @@ public:
 			return false;
 	}
 
+
+
 	bool Move(const long long& c) {
 		long long zero = 1LL << (order - 1);
 		while ((zero + c + head) >= static_cast<long long>(Tape.size())) {
@@ -636,10 +638,27 @@ public:
 		);
 
 		language->InterpretNullaryVoidFunction(u8"nothing", ng, [this]() { this->Nothing(); }, name);
-		language->InterpretMediumFunction(u8"start", st, [this](const Medium<char8_t>& prog) { return this->StartSemantic(prog); }, name);
-		// language->InterpretMediumFunction(u8"start", st, [this](const Medium<char8_t>& prog) { return this->StartSemantic(prog); });
+
+		language->Interpret(
+			std::set<Program<char8_t>>{},
+			u8"start",
+			st,
+			[this](const Token<char8_t>& prog) { return this->StartSyntax(prog); },
+			[this](const Token<char8_t>& prog) { return this->StartSemantic(std::get<Medium<char8_t>>(prog)); },
+			name
+		);
+
 		language->InterpretNullaryVoidFunction(u8"end", ed, [this]() { this->End(); }, name);
-		language->InterpretMediumFunction(u8"call", cl, [this](const Medium<char8_t>& prog) { return this->CallSemantic(prog); }, name);
+
+		language->Interpret(
+			std::set<Program<char8_t>>{},
+			u8"call",
+			cl,
+			[this](const Token<char8_t>& prog) { return this->CallSyntax(prog); },
+			[this](const Token<char8_t>& prog) { return this->CallSemantic(std::get<Medium<char8_t>>(prog)); },
+			name
+		);
+
 		language->InterpretNullaryVoidFunction(u8"reset", rt, [this]() { this->Reset(); }, name);
 
 		language->Interpret(
@@ -875,6 +894,25 @@ public:
 		StateRegister->Load(u8"load name null nothing");
 	}
 
+	unsigned long long StartSyntax(const Token<char8_t>& program) {
+		if (!std::holds_alternative<Medium<char8_t>>(program)) return 0;
+		Medium<char8_t> prog = std::get<Medium<char8_t>>(program);
+		if (st.contains(language->Munch(prog))) {
+
+			if (!prog.empty()) {
+				Medium<char8_t> arg = language->Munch(prog);
+
+				if (str_predicate(isdigit, arg)) {
+					return std::get<Medium<char8_t>>(program).size() - prog.size();
+				}
+			}
+			else {
+				return std::get<Medium<char8_t>>(program).size();
+			}
+		}
+		else return 0;
+	}
+
 	std::any StartSemantic(Medium<char8_t> program) {
 		Medium<char8_t> prog = program;
 		language->Munch(prog); // Remove "start" command
@@ -958,6 +996,20 @@ public:
 		}
 		else std::cerr << "State not in memory";
 		return retval;
+	}
+
+	unsigned long long CallSyntax(const Token<char8_t>& program) {
+		if (!std::holds_alternative<Medium<char8_t>>(program)) return 0;
+		Medium<char8_t> prog = std::get<Medium<char8_t>>(program);
+		if (cl.contains(language->Munch(prog)) && !prog.empty()) {
+			Medium<char8_t> state = language->Munch(prog);
+			if (!state.empty()) {
+				if (str_predicate(isalpha, state) || str_predicate(isdigit, state)) {
+					return std::get<Medium<char8_t>>(program).size() - prog.size();
+				}
+			}
+		}
+		return 0;
 	}
 
 	std::any CallSemantic(const Medium<char8_t>& program) {

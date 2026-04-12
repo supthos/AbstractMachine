@@ -628,13 +628,12 @@ public:
 		// 4. Update symbols and check alphabet
 		AddSymbols(t);
 		AddSymbols(a);
-
-		std::set<Medium<V>> n = { std::get<Medium<V>>(t) };
-		RegisteredNames[context].push_back(n);
     
 		if (is_word(t)) {
 			// 5. CRITICAL: Push to the persistent Interpretation vector in C
 			targetInterp.push_back(std::make_tuple(t, syn, sem));
+			std::set<Medium<V>> n = { std::get<Medium<V>>(t) };
+			RegisteredNames[context].push_back(n);
 			return true;
 		}
 		return false;
@@ -678,57 +677,25 @@ public:
 	}
 
 	bool InterpretNullaryFunction(const Token<V>& t, const std::set<Medium<V>>& comms, std::function<std::any ()> f, Medium<V> context) {
-		bool s = false;
-		for (const auto& n : comms) {
-			s = s || (is_registered(n,context));
-		}
-
-		if (s) {
-			std::cerr << "Can't register names";
-			return false;
-		}
-
-		s = Interpret(
+		return Interpret(
 			std::set<Program<V>>{},
 			t,
+			comms,
 			[this, comms](const Token<V>& prog) { return this->MediumFunctionSyntax(prog, comms); },
 			[this, f](const Token<V>& prog) { return this->NullarySemantic(f); },
 			context
 		);
-
-		if (s) {
-			RegisteredNames[context].push_back(comms);
-			return true;
-		}
-
-		else return false;
 	}
 
 	bool InterpretNullaryVoidFunction(const Token<V>& t, const std::set<Medium<V>>& comms, std::function<void()> f, Medium<V> context) {
-		bool s = false;
-		for (const auto& n : comms) {
-			s = s || (is_registered(n, context));
-		}
-
-		if (s) {
-			std::cerr << "Can't register names";
-			return false;
-		}
-
-		s = Interpret(
+		return Interpret(
 			std::set<Program<V>>{},
 			t,
+			comms,
 			[this, comms](const Token<V>& prog) { return this->MediumFunctionSyntax(prog, comms); },
 			[this, f](const Token<V>& prog) { this->VoidSemantic(f); return std::any{}; },
 			context
 		);
-
-		if (s) {
-			RegisteredNames[context].push_back(comms);
-			return true;
-		}
-
-		else return false;
 	}
 
 	// Interpret method overload for Value types, or any object.
@@ -780,30 +747,36 @@ public:
 	}
 
 	bool InterpretMediumFunction(const Token<V>& name, const std::set<Medium<V>>& comms, std::function<std::any(const Medium<V>&)> f, Medium<V> context) {
-		bool s = false;
-		for (const auto& n : comms) {
-			s = s || (is_registered(n,context));
-		}
-
-		if (s) {
-			std::cerr << "Can't register names";
-			return false;
-		}
-		
-		s = Interpret(
+		return Interpret(
 			std::set<Program<V>>{}, 
 			name, 
+			comms,
 			[this, comms](const Token<V>& prog) { return this->MediumFunctionSyntax(prog, comms); },
 			[this, f](const Token<V>& prog) { return this->MediumFunctionSemantic(prog, f); },
 			context
 		);
-		
-		if (s) {
-			RegisteredNames[context].push_back(comms);
-			return true;
-		}
+	}
 
-		else return false;
+	bool InterpretIntegerArgumentMediumFunction(const Token<V>& name, const std::set<Medium<V>>& comms, std::function<std::any(const Medium<V>&)> f, Medium<V> context) {
+		return Interpret(
+			std::set<Program<V>>{},
+			name,
+			comms,
+			[this, comms](const Token<V>& prog) { return this->IntegerArgumentSyntax(prog, comms); },
+			[this, f](const Token<V>& prog) {return this->MediumFunctionSemantic(prog, f);	},
+			context
+		);
+	}
+
+	bool InterpretIntegerArgumentLongLongFunction(const Token<V>& name, const std::set<Medium<V>>& comms, std::function<std::any(const long long&)> f, Medium<V> context) {
+		return Interpret(
+			std::set<Program<V>>{},
+			name,
+			comms,
+			[this, comms](const Token<V>& prog) { return this->IntegerArgumentSyntax(prog, comms); },
+			[this, f](const Token<V>& prog) {return this->LongLongFunctionSemantic(prog, f);	},
+			context
+		);
 	}
 
 	// Helper function to interpret a token as a Name (i.e., a valid identifier in the language)s
@@ -849,12 +822,33 @@ public:
 
 	}
 
+	unsigned long long IntegerArgumentSyntax(const Token<V>& prog, const std::set<Medium<char8_t>>& comnames) {
+		if constexpr (Text<V> && std::is_same_v<V, char8_t>) {
+			if (std::holds_alternative<Medium<V>>(prog)) {
+				Medium<V> program = std::get<Medium<V>>(prog);
+				Medium<V> command = Munch(program);
+				if (comnames.contains(std::get<Medium<V>>(ToLower(command)))) {
+					Medium<V> arg = Munch(program);
+					if (str_predicate(isdigit, arg)) {
+						return std::get<Medium<V>>(prog).size() - program.size();
+					}
+				}
+			}
+		}
+		return 0;
+	}
+
 	std::any MediumFunctionSemantic(const Token<V>& prog, std::function<std::any(const Medium<V>&)> f) {
 		Medium<char8_t> program = std::get<Medium<char8_t>>(prog);
 		//Munch(program);
 		return f(program);
 	}
 
+	std::any LongLongFunctionSemantic(const Token<char8_t> prog, std::function<std::any(const long long&)> f) {
+		Medium<char8_t> program = std::get<Medium<char8_t>>(prog);
+		Munch(program); // Remove the command part, leaving only the argument
+		return f(std::stoll(std::string(program.begin(), program.end())));
+	}
 
 	std::any Evaluate(const Concept& C, const Token<V>& prog) {
 		auto [name, syn, sem] = C;
