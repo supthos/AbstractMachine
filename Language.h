@@ -395,13 +395,15 @@ public:
 
 	// This function extracts the first bite of a program.
 	Program<V> Nibble (Medium<V> & prog){
-		Program<V> bite;
+		Program<V> bite{};
 		size_t i = 0;
 		while (i < prog.size() && isspace((prog[i]))) {
 			++i;
 		}
-		bite = prog[i];
-		++i;
+		if (i < prog.size()) {
+			bite = prog[i];
+			++i;
+		}
 		while (i < prog.size() && isspace((prog[i]))) {
 			++i;
 		}
@@ -829,7 +831,7 @@ public:
 				Medium<V> command = Munch(program);
 				if (comnames.contains(std::get<Medium<V>>(ToLower(command)))) {
 					Medium<V> arg = Munch(program);
-					if (str_predicate(isdigit, arg)) {
+					if (IntegerPredicate(arg)) {
 						return std::get<Medium<V>>(prog).size() - program.size();
 					}
 				}
@@ -854,6 +856,84 @@ public:
 		auto [name, syn, sem] = C;
 		return sem(prog);
 	}
+
+
+	bool FloatPredicate(const Medium<V>& prog) {
+		if (prog.empty()) return false;
+
+		Medium<V> program = Lick(prog);
+
+		auto tokens = ChopLine(program);
+
+		if (tokens.empty()) return false;
+
+		if (tokens[0].first == u8"+" || tokens[0].first == u8"-") {
+			tokens.erase(tokens.begin());
+			if (tokens.empty()) return false;
+		}
+
+		if (str_predicate(isdigit, tokens[0].first)) {
+			tokens.erase(tokens.begin());
+			if (tokens.empty()) return true;
+		}
+
+		if (tokens[0].first == u8".") {
+			tokens.erase(tokens.begin());
+			if (tokens.empty()) return false;
+		}
+
+		if (str_predicate(isdigit, tokens[0].first)) {
+			tokens.erase(tokens.begin());
+			if (tokens.empty()) return true;
+		}
+
+		return false;
+	}
+
+	bool IntegerPredicate(const Medium<V>& prog) {
+		if (prog.empty()) return false;
+
+		Medium<V> program = Lick(prog);
+
+		auto tokens = ChopLine(program);
+
+		if (tokens.empty()) return false;
+
+		if (tokens[0].first == u8"+" || tokens[0].first == u8"-") {
+			tokens.erase(tokens.begin());
+			if (tokens.empty()) return false;
+		}
+
+		if (str_predicate(isdigit, tokens[0].first)) {
+			tokens.erase(tokens.begin());
+			if (tokens.empty()) return true;
+		}
+
+		return false;
+	}
+
+	//bool NumberPredicate2(const Medium<V>& prog) {
+	//	if (prog.empty()) return false;
+
+	//	Medium<V> program = prog;
+	//	if (Nibble(program) == u8'-' || Nibble(program) == u8'+') {
+	//		if (program.empty()) return false;
+	//	}
+	//	while (!program.empty()) {
+	//		Program<V> bite = Nibble(program);
+	//		if ()
+
+	//		if (token.size() != 1 || !isdigit(static_cast<char32_t>(token[0]))) {
+	//			return false;
+	//		}
+	//	}
+	//	for (const V& c : prog) {
+	//		if (!isdigit(static_cast<char32_t>(c))) {
+	//			return false;
+	//		}
+	//	}
+	//	return true;
+	//}
 
 };
 
