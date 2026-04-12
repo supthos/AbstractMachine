@@ -874,7 +874,7 @@ public:
 			AddResource(std::make_unique<Substrate<bool>>(language));
 			Tape = static_cast<Substrate<TapeSymbol>*>(Resources.back().get());
 		}
-		if (!is_resource(u8"StateRegister")) {
+		if (!is_resource(u8"States")) {
 			AddResource(std::make_unique<States>(language));
 			StateRegister = static_cast<States*>(Resources.back().get());
 		}
@@ -894,7 +894,7 @@ public:
 			AddResource(std::make_unique<Substrate<bool>>(language));
 			Tape = static_cast<Substrate<TapeSymbol>*>(Resources.back().get());
 		}
-		if (!is_resource(u8"StateRegister")) {
+		if (!is_resource(u8"States")) {
 			AddResource(std::make_unique<States>(language));
 			StateRegister = static_cast<States*>(Resources.back().get());
 		}
