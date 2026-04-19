@@ -75,8 +75,17 @@ public:
 	unsigned long long PreviousState() const { return previous.back(); }
 
 	// return true if in accepting state
-	bool Accepting() const { return accepting.contains(state); }
-	bool Accepting(unsigned long st) const { return  accepting.contains(st); }
+	bool Accepting() const { return Accepting(state); }
+	bool Accepting(unsigned long long st) const { 
+		if (accepting.contains(st)) {
+			std::cout << "Accepting State.\n";
+			return true;
+		}
+		else {
+			std::cout << "Not Accepting State.\n";
+			return false;
+		}
+	}
 
 	// Load returns a pair of the state kind and the new state number. 
 	std::pair<StateKind, unsigned long long> Load(const Token<char8_t>& program) {
@@ -202,7 +211,7 @@ public:
 				else if (str_predicate(isdigit, prog)) {
 					//unsigned long s = std::stoull(std::string(prog.begin(), prog.end()));
 					std::string str(reinterpret_cast<const char*>(prog.data()), prog.size());
-					unsigned long s = std::stoull(str);
+					unsigned long long s = std::stoull(str);
 					return Accepting(s);
 				}
 			}
@@ -237,6 +246,7 @@ public:
 	std::set<Medium<char8_t>> gotocomms = { u8"goto", u8"go" };
 	std::set<Medium<char8_t>> shrinkcomms = { u8"shrink", u8"sk" };
 	std::set<Medium<char8_t>> movecomms = { u8"move", u8"me" };
+	std::set<Medium<char8_t>> clearcomms = { u8"clear", u8"cr" };
 
 
 	Medium<V> Tape;
@@ -260,6 +270,7 @@ public:
 		language->InterpretNullaryFunction(u8"right", rightcomms, [this]() { return Right(); }, name);
 
 		language->InterpretNullaryVoidFunction(u8"shrink", shrinkcomms, [this]() { Shrink(); }, name);
+		language->InterpretNullaryVoidFunction(u8"clear", clearcomms, [this]() { Clear(); }, name);
 
 		language->Interpret(
 			std::set<char8_t>{},
@@ -456,7 +467,10 @@ public:
 		}
 	}
 
-
+	void Clear() {
+		head = 0;
+		std::fill(std::begin(Tape), std::end(Tape), V{});
+	}
 
 	V Read() {
 		std::int64_t zero = static_cast<std::int64_t>(Tape.size()) / 2;
@@ -930,7 +944,7 @@ public:
 		StateRegister->Load(u8"load name null nothing");
 	}
 
-	unsigned long long StartSyntax(const Token<char8_t>& program) {
+	unsigned long long StartSyntax(const Token<char8_t>& program) const {
 		if (!std::holds_alternative<Medium<char8_t>>(program)) return 0;
 		Medium<char8_t> prog = std::get<Medium<char8_t>>(program);
 		if (st.contains(language->Munch(prog))) {
@@ -1034,7 +1048,7 @@ public:
 		return retval;
 	}
 
-	unsigned long long CallSyntax(const Token<char8_t>& program) {
+	unsigned long long CallSyntax(const Token<char8_t>& program) const {
 		if (!std::holds_alternative<Medium<char8_t>>(program)) return 0;
 		Medium<char8_t> prog = std::get<Medium<char8_t>>(program);
 		if (cl.contains(language->Munch(prog)) && !prog.empty()) {

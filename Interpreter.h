@@ -77,7 +77,7 @@ public:
 			getline(std::cin, CurrentLine);
 
 			// Eval
-			if (u8"exit" == std::get<Medium<char8_t>>(ToLower(CurrentLine))) {
+			if (u8"exit" == std::get<Medium<char8_t>>(ToLower(A->language->Lick(CurrentLine)))) {
 				exit = true;
 			}
 			else {

@@ -718,16 +718,12 @@ public:
 		const char* raw_name = typeid(T).name();
 		std::string narrow_name(raw_name);
 
-		Token<V> type_token;
-		if constexpr (String<Program<V>>) {
-			type_token = Program<V>(narrow_name.begin(), narrow_name.end());
-		} else if constexpr (Char<Program<V>>) {
-			return false;	
-		}
+		// Convert narrow string to the Medium<V> (u8string/string)
+		Medium<V> type_name(narrow_name.begin(), narrow_name.end());
 
-		if (std::get<0>(has_interpretation(type_token, context)) == nullptr) {
+		if (std::get<0>(has_interpretation(type_name, context)) == nullptr) {
 			T epsilon {};
-			return Interpret(type_token, epsilon, context);
+			return Interpret(type_name, epsilon, context);
 		}
 		return false;
 	}
@@ -893,7 +889,7 @@ public:
 		return false;
 	}
 	
-	bool IntegerPredicate(const Medium<V>& prog) {
+ 	bool IntegerPredicate(const Medium<V>& prog) {
 		if (prog.empty()) return false;
 
 		Medium<V> iprog = prog;
