@@ -1,0 +1,31 @@
+add one, successor:
+load name iszero write 1
+load name isone write 0 right call addone left
+load name addone branch 0 iszero isone
+call addone
+
+left add one:
+load name iszero write 1
+load name wasone write 0 left call laddone right
+load name laddone branch 0 iszero wasone
+call laddone
+
+subtract one, predecessor:
+load name a write false
+load name b write true right call subone left
+load name subone branch true a b
+call subone
+
+
+3-state Busy Beaver:
+reset
+load name subao write 1 left call b
+load name subai write 1 right call c
+load name a branch 0 subao subai
+load name subbo write 1 right call a
+load name subbi write 1 left call b
+load name b branch 0 subbo subbi
+load name subco write 1 right call b
+load name subci write 1 end
+load name c branch 0 subco subci
+call a
