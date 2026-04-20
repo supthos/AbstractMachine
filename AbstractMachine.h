@@ -68,6 +68,8 @@ public:
 	std::vector<unsigned long long> previous{}; //Previous state stack for backtracking
 	std::set<unsigned long long> accepting{};
 
+	std::vector<unsigned long long> callstack{}; // Call stack for subroutine calls, if needed in future extensions
+
 	unsigned long long State() const { return state; }
 
 	unsigned long long Instruction() const { return icount; }
@@ -795,16 +797,94 @@ public:
 		return pf;
 	}
 
-	std::vector<std::tuple<Token<char8_t>, std::any, unsigned long long>> Run(const Medium<char8_t>& prog) {
+	void ProcessLine(const Medium<char8_t>& prog) {
+
+		ProgramFile<char8_t> pf = ChopLine2(prog);
+
+		for (auto it = pf.rbegin(); it != pf.rend(); it++) {
+			//ProcessLine(*it);
+
+			unsigned long long tempstate = StateRegister->Load(u8"load " + (*it)).second;
+
+			Call(tempstate);
+		}
+
+		
+	}
+
+	void PrintEvaluationResult(const std::any& result) {
+		if (!result.has_value()) {
+			std::cout << "Result: (empty/void)" << std::endl;
+			return;
+		}
+
+		// Attempt to cast to known types defined in Language.h
+		if (result.type() == typeid(Token<char8_t>)) {
+			std::cout << "Token: " << std::any_cast<Token<char8_t>>(result) << std::endl;
+		}
+		else if (result.type() == typeid(std::u8string)) {
+			std::cout << "String: " << std::any_cast<std::u8string>(result) << std::endl;
+		}
+		else if (result.type() == typeid(int)) {
+			std::cout << "Int: " << std::any_cast<int>(result) << std::endl;
+		}
+		else if (result.type() == typeid(unsigned long long)) {
+			std::cout << "ULL: " << std::any_cast<unsigned long long>(result) << std::endl;
+		}
+		else if (result.type() == typeid(bool)) {
+			std::cout << "Bool: " << (std::any_cast<bool>(result) ? "true" : "false") << std::endl;
+		}
+		else if (result.type() == typeid(double)) {
+			std::cout << "Double: " << std::any_cast<double>(result) << std::endl;
+		}
+		else {
+			std::cout << "Result holds type: " << result.type().name()
+				<< " (Printer for this type not implemented)." << std::endl;
+		}
+	}
+
+	std::vector<std::tuple<Token<char8_t>, std::any, unsigned long long>> Run(const Medium<char8_t>& program) {
+		std::vector<std::tuple<Token<char8_t>, std::any, unsigned long long>> results;
+		ProcessLine(program);
+		while (!StateRegister->callstack.empty()) {
+			auto [Concept_Ref, result, consumed] = RunStep();
+
+			if (consumed > 0) {
+				auto tok = std::get<0>(Concept_Ref);
+				std::cout << "Matched: " << tok << " => ";
+				PrintEvaluationResult(result); // already handles empty std::any gracefully
+				results.push_back(std::make_tuple(tok, result, consumed));
+			}
+			else {
+				std::cout << "Error: No matching language rule found for part of the input.\n";
+			}
+		}
+		return results;
+	}
+
+	//std::vector<std::tuple<Token<char8_t>, std::any, unsigned long long>> Run(const Medium<char8_t>& prog) {
+	std::tuple<Token<char8_t>, std::any, unsigned long long> RunStep() {
 		//unsigned long long retval = unsigned long long(true);
 
 		//StateRegister->icount = 0;
 
-		std::vector<std::tuple<Token<char8_t>, std::any, unsigned long long>> results;
+		//std::vector<std::tuple<Token<char8_t>, std::any, unsigned long long>> results;
+		std::tuple<Token<char8_t>, std::any, unsigned long long> result;
 		Medium<char8_t> program{};
 
-		ProgramFile<char8_t> pf = ChopLine2(prog);
-		for (auto& line : pf) {
+		
+
+		
+
+		//const auto& line = pf[0];
+		const Medium<char8_t> line = std::get<Medium<char8_t>>(StateRegister->states[StateRegister->callstack.back()]);
+
+			StateRegister->state = StateRegister->previous.back();
+			StateRegister->previous.pop_back();
+			StateRegister->icount = StateRegister->instnum.back();
+			StateRegister->instnum.pop_back();
+
+			StateRegister->callstack.pop_back();
 
 			auto contexts = language->is_well_formed_context(line);
 
@@ -813,7 +893,8 @@ public:
 			if (contexts.empty()) {
 				std::cerr << "No interpretation found for: "
 					<< reinterpret_cast<const char*>(line.c_str()) << "\n";
-				continue;
+				//continue;
+				return {};
 			}
 			else if (contexts.size() > 1) {
 				for (auto it = contexts.begin(); it != contexts.end(); it++) {
@@ -829,35 +910,44 @@ public:
 					}
 					std::cout << "# ";
 					std::cin >> i;
+					while (i >= contexts.size()) {
+						std::cerr << "Invalid selection.\n";
+						std::cout << "# ";
+						std::cin >> i;
+					}
 				}
 			}
 
 			auto [Concept_Ptr, consumed, context] = language->has_interpretation(line, contexts[i]);
 
+			if (consumed > 0 && consumed < line.size()) {
+				program = Medium<char8_t>(line.begin() + consumed, line.end());
+				ProcessLine(program);
+
+				//auto subresults = Run(program);
+				//results.insert(results.end(), subresults.begin(), subresults.end());
+			}
+
 			if (consumed > 0 && Concept_Ptr != nullptr) {
 				program = Medium<char8_t>(line.begin(), line.begin() + consumed);
 
-				results.push_back(std::make_tuple(std::get<0>(*Concept_Ptr), language->Evaluate(*Concept_Ptr, program), consumed));
+				result = std::make_tuple(std::get<0>(*Concept_Ptr), language->Evaluate(*Concept_Ptr, program), consumed);
 			}
 
-			if (consumed > 0 && consumed < line.size()) {
-				program = Medium<char8_t>(line.begin() + consumed, line.end());
-				auto subresults = Run(program);
-				results.insert(results.end(), subresults.begin(), subresults.end());
-			}
-			consumed = 0;
-			for (const auto& [concepts, value, length] : results) {
-				consumed += length;
-			}
-			if (consumed < line.size()) {
-				program = Medium<char8_t>(line.begin() + consumed, line.end());
-				if (!str_predicate(isspace, program)) {
-					throw std::invalid_argument("Unconsumed input remaining after evaluation\n");
-					return {};
-				}
-			}
-		}
-		return results;
+			
+			//consumed = 0;
+			//for (const auto& [concepts, value, length] : results) {
+			//	consumed += length;
+			//}
+			//if (consumed < line.size()) {
+			//	program = Medium<char8_t>(line.begin() + consumed, line.end());
+			//	if (!str_predicate(isspace, program)) {
+			//		throw std::invalid_argument("Unconsumed input remaining after evaluation\n");
+			//		return {};
+			//	}
+			//}
+		
+		return result;
 	}
 
 	void AddResource(std::unique_ptr<Resource> res) {
@@ -1030,22 +1120,26 @@ public:
 			<< "States: " << StateRegister->states.size() << std::endl;
 	}
 
-	std::any Call(unsigned long long state) {
+	bool Call(unsigned long long state) {
 		std::any retval = false;
 		if (StateRegister->states.contains(state)) {
 			StateRegister->previous.push_back(StateRegister->state);
 			StateRegister->instnum.push_back(StateRegister->icount);
 			StateRegister->state = state;
 
-			retval = Run(std::get<Medium<char8_t>>(StateRegister->states[state]));
+			//retval = Run(std::get<Medium<char8_t>>(StateRegister->states[state]));
 
-			StateRegister->state = StateRegister->previous.back();
-			StateRegister->previous.pop_back();
-			StateRegister->icount = StateRegister->instnum.back();
-			StateRegister->instnum.pop_back();
+			StateRegister->callstack.push_back(state);
+
+
+			//StateRegister->state = StateRegister->previous.back();
+			//StateRegister->previous.pop_back();
+			//StateRegister->icount = StateRegister->instnum.back();
+			//StateRegister->instnum.pop_back();
 		}
 		else std::cerr << "State not in memory";
-		return retval;
+		//return retval;
+		return true;
 	}
 
 	unsigned long long CallSyntax(const Token<char8_t>& program) const {

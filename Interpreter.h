@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <Print>
+#include <print>
 #include <iostream>
 #include "Language.h"
 
@@ -36,36 +36,7 @@ public:
 		}
 	}
 
-	void PrintEvaluationResult(const std::any& result) {
-		if (!result.has_value()) {
-			std::cout << "Result: (empty/void)" << std::endl;
-			return;
-		}
-
-		// Attempt to cast to known types defined in Language.h
-		if (result.type() == typeid(Token<char8_t>)) {
-			std::cout << "Token: " << std::any_cast<Token<char8_t>>(result) << std::endl;
-		}
-		else if (result.type() == typeid(std::u8string)) {
-			std::cout << "String: " << std::any_cast<std::u8string>(result) << std::endl;
-		}
-		else if (result.type() == typeid(int)) {
-			std::cout << "Int: " << std::any_cast<int>(result) << std::endl;
-		}
-		else if (result.type() == typeid(unsigned long long)) {
-			std::cout << "ULL: " << std::any_cast<unsigned long long>(result) << std::endl;
-		}
-		else if (result.type() == typeid(bool)) {
-			std::cout << "Bool: " << (std::any_cast<bool>(result) ? "true" : "false") << std::endl;
-		}
-		else if (result.type() == typeid(double)) {
-			std::cout << "Double: " << std::any_cast<double>(result) << std::endl;
-		}
-		else {
-			std::cout << "Result holds type: " << result.type().name()
-				<< " (Printer for this type not implemented)." << std::endl;
-		}
-	}
+	
 
 	void REPL() {
 		bool exit = false;
@@ -82,21 +53,10 @@ public:
 			}
 			else {
 				// Eval
-				auto eval = A->Run(CurrentLine);
+				A->Run(CurrentLine);
 
-				for (auto [Concept_Ref, result, prog] : eval) {
-					// Concept_Ptr is a pointer to the matched tuple (Token, Syntax, Semantic)
-					if (&Concept_Ref) {
-						auto tok = std::get<0>(Concept_Ref);
-						std::cout << "Matched: " << tok << " => ";
+				//A->StateRegister->Unload(u8"temp");
 
-						// Use the printer helper
-						PrintEvaluationResult(result);
-					}
-					else {
-						std::cout << "Error: No matching language rule found for part of the input.\n";
-					}
-				}
 				//auto eval = A->Run(CurrentLine);
 
 				//// Print
