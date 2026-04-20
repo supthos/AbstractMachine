@@ -862,91 +862,77 @@ public:
 		return results;
 	}
 
-	//std::vector<std::tuple<Token<char8_t>, std::any, unsigned long long>> Run(const Medium<char8_t>& prog) {
 	std::tuple<Token<char8_t>, std::any, unsigned long long> RunStep() {
-		//unsigned long long retval = unsigned long long(true);
-
-		//StateRegister->icount = 0;
-
-		//std::vector<std::tuple<Token<char8_t>, std::any, unsigned long long>> results;
 		std::tuple<Token<char8_t>, std::any, unsigned long long> result;
 		Medium<char8_t> program{};
 
-		
+		// 1. PEEK at the current executing state (Do not revert the state yet)
+		unsigned long long currentState = StateRegister->callstack.back();
+		const Medium<char8_t> line = std::get<Medium<char8_t>>(StateRegister->states[currentState]);
 
-		
+		// 2. POP the stacks to consume the instruction, but store the rollback data
+		StateRegister->callstack.pop_back();
 
-		//const auto& line = pf[0];
-		const Medium<char8_t> line = std::get<Medium<char8_t>>(StateRegister->states[StateRegister->callstack.back()]);
+		unsigned long long callerState = StateRegister->previous.back();
+		StateRegister->previous.pop_back();
 
-			StateRegister->state = StateRegister->previous.back();
-			StateRegister->previous.pop_back();
-			StateRegister->icount = StateRegister->instnum.back();
-			StateRegister->instnum.pop_back();
+		unsigned long long callerIcount = StateRegister->instnum.back();
+		StateRegister->instnum.pop_back();
 
-			StateRegister->callstack.pop_back();
+		// Notice: We DO NOT assign StateRegister->state = callerState here. 
+		// StateRegister->state remains 'currentState' so the instruction knows its own context.
 
-			auto contexts = language->is_well_formed_context(line);
+		auto contexts = language->is_well_formed_context(line);
+		unsigned i = 0;
 
-			unsigned i = 0;
-
-			if (contexts.empty()) {
-				std::cerr << "No interpretation found for: "
-					<< reinterpret_cast<const char*>(line.c_str()) << "\n";
-				//continue;
-				return {};
-			}
-			else if (contexts.size() > 1) {
-				for (auto it = contexts.begin(); it != contexts.end(); it++) {
-					if ((*it) == u8"Literal") {
-						it = contexts.erase(it);
-						break;
-					}
+		if (contexts.empty()) {
+			std::cerr << "No interpretation found for: "
+				<< reinterpret_cast<const char*>(line.c_str()) << "\n";
+			return {};
+		}
+		else if (contexts.size() > 1) {
+			for (auto it = contexts.begin(); it != contexts.end(); it++) {
+				if ((*it) == u8"Literal") {
+					it = contexts.erase(it);
+					break;
 				}
-				if (contexts.size() > 1) {
-					std::cout << "Choose a non-trivial Context for interpretation.\n";
-					for (const auto&  ctx : contexts) {
-						std::cout << i++ << ": " << ctx << "\n";
-					}
+			}
+			if (contexts.size() > 1) {
+				std::cout << "Choose a non-trivial Context for interpretation.\n";
+				for (const auto& ctx : contexts) {
+					std::cout << i++ << ": " << ctx << "\n";
+				}
+				std::cout << "# ";
+				std::cin >> i;
+				while (i >= contexts.size()) {
+					std::cerr << "Invalid selection.\n";
 					std::cout << "# ";
 					std::cin >> i;
-					while (i >= contexts.size()) {
-						std::cerr << "Invalid selection.\n";
-						std::cout << "# ";
-						std::cin >> i;
-					}
 				}
 			}
+		}
 
-			auto [Concept_Ptr, consumed, context] = language->has_interpretation(line, contexts[i]);
+		auto [Concept_Ptr, consumed, context] = language->has_interpretation(line, contexts[i]);
 
-			if (consumed > 0 && consumed < line.size()) {
-				program = Medium<char8_t>(line.begin() + consumed, line.end());
-				ProcessLine(program);
+		if (consumed > 0 && consumed < line.size()) {
+			program = Medium<char8_t>(line.begin() + consumed, line.end());
+			ProcessLine(program);
+		}
 
-				//auto subresults = Run(program);
-				//results.insert(results.end(), subresults.begin(), subresults.end());
-			}
+		// 3. EVALUATE the instruction using the CORRECT current state
+		if (consumed > 0 && Concept_Ptr != nullptr) {
+			program = Medium<char8_t>(line.begin(), line.begin() + consumed);
+			result = std::make_tuple(std::get<0>(*Concept_Ptr), language->Evaluate(*Concept_Ptr, program), consumed);
+		}
 
-			if (consumed > 0 && Concept_Ptr != nullptr) {
-				program = Medium<char8_t>(line.begin(), line.begin() + consumed);
+		// 4. CONDITIONAL RESTORATION
+		// If Evaluate() executed a Branch or Call, it will have modified StateRegister->state.
+		// We only restore the caller's state if we are still in the state we just finished executing.
+		if (StateRegister->state == currentState) {
+			StateRegister->state = callerState;
+			StateRegister->icount = callerIcount;
+		}
 
-				result = std::make_tuple(std::get<0>(*Concept_Ptr), language->Evaluate(*Concept_Ptr, program), consumed);
-			}
-
-			
-			//consumed = 0;
-			//for (const auto& [concepts, value, length] : results) {
-			//	consumed += length;
-			//}
-			//if (consumed < line.size()) {
-			//	program = Medium<char8_t>(line.begin() + consumed, line.end());
-			//	if (!str_predicate(isspace, program)) {
-			//		throw std::invalid_argument("Unconsumed input remaining after evaluation\n");
-			//		return {};
-			//	}
-			//}
-		
 		return result;
 	}
 
