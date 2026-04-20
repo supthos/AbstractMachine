@@ -29,3 +29,11 @@ load name subco write 1 right call b
 load name subci write 1 end
 load name c branch 0 subco subci
 call a
+
+
+Recursive addition:
+load name iszero write 1
+load name isone write 0 right call addone left
+load name addone branch 0 iszero isone
+load name recadd call addone end call recadd
+call recadd
