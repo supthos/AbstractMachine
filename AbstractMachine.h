@@ -28,6 +28,7 @@ public:
 	std::set<Medium<char8_t>> ne = { u8"name", u8"ne" };
 	std::set<Medium<char8_t>> ag = { u8"accepting", u8"ag" };
 	std::set<Medium<char8_t>> st = { u8"start", u8"st" };
+	std::set<Medium<char8_t>> tp = { u8"temp", u8"tp" };
 
 	States(std::shared_ptr<Language<char8_t>> lang) {
 		name = u8"States";
@@ -55,6 +56,7 @@ public:
 		ER = -1, // Error state
 		NL = 0, // Normal state
 		AG = 1, // Accepting state
+		TP = 2  // Temporary state (not accepting by default)
 	};
 
 
@@ -67,6 +69,8 @@ public:
 	std::vector<unsigned long long> instnum{}; //Instruction number stack
 	std::vector<unsigned long long> previous{}; //Previous state stack for backtracking
 	std::set<unsigned long long> accepting{};
+
+	std::set<unsigned long long> temp_states{}; // Temporary states that are not accepting by default, but can be marked as accepting later if needed
 
 	std::vector<unsigned long long> callstack{}; // Call stack for subroutine calls, if needed in future extensions
 
@@ -89,6 +93,11 @@ public:
 		}
 	}
 
+	// return true if in temporary state
+	bool TempState(unsigned long long st) const {
+		return temp_states.contains(st);
+	}
+
 	// Load returns a pair of the state kind and the new state number. 
 	std::pair<StateKind, unsigned long long> Load(const Token<char8_t>& program) {
 		Medium<char8_t> prog = std::get<Medium<char8_t>>(program);
@@ -101,6 +110,11 @@ public:
 		if (at.contains(std::get<Medium<char8_t>>(ToLower(language->Lick(prog))))) {
 			kind = StateKind::AG;
 			language->Munch(prog); // Remove "accept"
+		}
+		else if (tp.contains(std::get<Medium<char8_t>>(ToLower(language->Lick(prog))))) {
+			kind = StateKind::TP; // Temporary states are not accepting by default
+			// lol.. TP.... like toilet paper
+			language->Munch(prog); // Remove "temp"
 		}
 
 		if (!prog.empty()) {
@@ -128,6 +142,9 @@ public:
 				if (kind == StateKind::AG) {
 					Accept(new_state);
 				}
+				else if (kind == StateKind::TP) {
+					Temp(new_state);
+				}
 				return std::make_pair(kind, new_state);
 			}
 			else {
@@ -141,6 +158,9 @@ public:
 		states[new_state] = prog;
 		if (kind == StateKind::AG) {
 			Accept(new_state);
+		}
+		else if (kind == StateKind::TP) {
+			Temp(new_state);
 		}
 		return std::make_pair(kind, new_state);
 	}
@@ -225,6 +245,14 @@ public:
 	bool Accept(unsigned long long st) {
 		if (states.contains(st)) {
 			accepting.insert(st);
+			return true;
+		}
+		else { return false; }
+	}
+
+	bool Temp(unsigned long long st) {
+		if (states.contains(st)) {
+			temp_states.insert(st);
 			return true;
 		}
 		else { return false; }
@@ -804,7 +832,7 @@ public:
 		for (auto it = pf.rbegin(); it != pf.rend(); it++) {
 			//ProcessLine(*it);
 
-			unsigned long long tempstate = StateRegister->Load(u8"load " + (*it)).second;
+			unsigned long long tempstate = StateRegister->Load(u8"load temp " + (*it)).second;
 
 			Call(tempstate);
 		}
@@ -919,6 +947,12 @@ public:
 			ProcessLine(program);
 		}
 
+		// If the instruction was not successfully consumed, we do not modify the state and simply return an empty result.
+		if (StateRegister->TempState(currentState)) {
+			StateRegister->states.erase(currentState);
+			StateRegister->temp_states.erase(currentState);
+		}
+
 		// 3. EVALUATE the instruction using the CORRECT current state
 		if (consumed > 0 && Concept_Ptr != nullptr) {
 			program = Medium<char8_t>(line.begin(), line.begin() + consumed);
@@ -932,6 +966,9 @@ public:
 			StateRegister->state = callerState;
 			StateRegister->icount = callerIcount;
 		}
+
+		// 5. CLEANUP: If the instruction was successfully consumed, we can discard the current state.
+
 
 		return result;
 	}
