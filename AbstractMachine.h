@@ -1060,14 +1060,18 @@ public:
 		if (st.contains(language->Munch(prog))) {
 
 			if (!prog.empty()) {
-				Medium<char8_t> arg = language->Munch(prog);
+				Medium<char8_t> arg = language->Lick(prog);
 
 				if (str_predicate(isdigit, arg)) {
+					language->Munch(prog);
+					return std::get<Medium<char8_t>>(program).size() - prog.size();
+				}
+				else {
 					return std::get<Medium<char8_t>>(program).size() - prog.size();
 				}
 			}
 			else {
-				return std::get<Medium<char8_t>>(program).size();
+				return std::get<Medium<char8_t>>(program).size() - prog.size();
 			}
 		}
 		else return 0;
@@ -1078,14 +1082,12 @@ public:
 		language->Munch(prog); // Remove "start" command
 		if (!prog.empty()) {
 			prog = language->Munch(prog); // Get the next token which should be the tape order
-			if (!prog.empty()) {
-				if (str_predicate(isdigit, prog)) {
-					//unsigned long n = std::stoull(std::string(prog.begin(), prog.end()));
-					std::string str(reinterpret_cast<const char*>(prog.data()), prog.size());
-					unsigned long n = std::stoull(str);
-					Start(n);
-				}
-			}
+
+			//unsigned long n = std::stoull(std::string(prog.begin(), prog.end()));
+			std::string str(reinterpret_cast<const char*>(prog.data()), prog.size());
+			unsigned long n = std::stoull(str);
+			Start(n);
+
 		}
 		else Start();
 		return {};
