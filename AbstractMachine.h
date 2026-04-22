@@ -947,12 +947,6 @@ public:
 			ProcessLine(program);
 		}
 
-		// If the instruction was not successfully consumed, we do not modify the state and simply return an empty result.
-		if (StateRegister->TempState(currentState)) {
-			StateRegister->states.erase(currentState);
-			StateRegister->temp_states.erase(currentState);
-		}
-
 		// 3. EVALUATE the instruction using the CORRECT current state
 		if (consumed > 0 && Concept_Ptr != nullptr) {
 			program = Medium<char8_t>(line.begin(), line.begin() + consumed);
@@ -968,7 +962,10 @@ public:
 		}
 
 		// 5. CLEANUP: If the instruction was successfully consumed, we can discard the current state.
-
+		if (StateRegister->TempState(currentState)) {
+			StateRegister->states.erase(currentState);
+			StateRegister->temp_states.erase(currentState);
+		}
 
 		return result;
 	}
