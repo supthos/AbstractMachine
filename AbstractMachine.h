@@ -70,7 +70,9 @@ public:
 	std::vector<unsigned long long> previous{}; //Previous state stack for backtracking
 	std::set<unsigned long long> accepting{};
 
-	std::set<unsigned long long> temp_states{}; // Temporary states that are not accepting by default, but can be marked as accepting later if needed
+	std::vector<unsigned long long> temp_states{}; // Temporary states that are not accepting by default, but can be marked as accepting later if needed
+
+	//std::vector < Medium<char8_t>> LineStack{};
 
 	std::vector<unsigned long long> callstack{}; // Call stack for subroutine calls, if needed in future extensions
 
@@ -94,8 +96,10 @@ public:
 	}
 
 	// return true if in temporary state
-	bool TempState(unsigned long long st) const {
-		return temp_states.contains(st);
+	std::vector<unsigned long long>::const_iterator TempState(unsigned long long st) const {
+		auto it = std::find(temp_states.begin(), temp_states.end(), st);
+		//return temp_states.contains(st);
+		return it;
 	}
 
 	// Load returns a pair of the state kind and the new state number. 
@@ -250,9 +254,11 @@ public:
 		else { return false; }
 	}
 
+	// This function register temporary states
 	bool Temp(unsigned long long st) {
 		if (states.contains(st)) {
-			temp_states.insert(st);
+			//temp_states.insert(st);
+			temp_states.push_back(st);
 			return true;
 		}
 		else { return false; }
@@ -962,9 +968,19 @@ public:
 		}
 
 		// 5. CLEANUP: If the instruction was successfully consumed, we can discard the current state.
-		if (StateRegister->TempState(currentState)) {
-			StateRegister->states.erase(currentState);
-			StateRegister->temp_states.erase(currentState);
+		auto TempIt = StateRegister->TempState(currentState);
+
+		if (TempIt != StateRegister->temp_states.end()) {
+			//StateRegister->temp_states.erase(currentState);
+
+			StateRegister->temp_states.erase(TempIt);
+
+			TempIt = StateRegister->TempState(currentState);
+			if (TempIt == StateRegister->temp_states.end()) {
+				StateRegister->states.erase(currentState);
+
+			}
+
 		}
 
 		return result;
