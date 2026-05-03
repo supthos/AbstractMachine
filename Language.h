@@ -683,7 +683,7 @@ public:
 			std::set<Program<V>>{},
 			t,
 			comms,
-			[this, comms](const Token<V>& prog) { return this->MediumFunctionSyntax(prog, comms); },
+			[this, comms](const Token<V>& prog) { return this->NullaryFunctionSyntax(prog, comms); },
 			[this, f](const Token<V>& prog) { return this->NullarySemantic(f); },
 			context
 		);
@@ -694,7 +694,7 @@ public:
 			std::set<Program<V>>{},
 			t,
 			comms,
-			[this, comms](const Token<V>& prog) { return this->MediumFunctionSyntax(prog, comms); },
+			[this, comms](const Token<V>& prog) { return this->NullaryFunctionSyntax(prog, comms); },
 			[this, f](const Token<V>& prog) { this->VoidSemantic(f); return std::any{}; },
 			context
 		);
@@ -830,6 +830,21 @@ public:
 					if (IntegerPredicate(arg)) {
 						return std::get<Medium<V>>(prog).size() - program.size();
 					}
+				}
+			}
+		}
+		return 0;
+	}
+
+	unsigned long long NullaryFunctionSyntax(const Token<V>& prog, const std::set<Medium<char8_t>>& comnames) {
+		if constexpr (Text<V> && std::is_same_v<V, char8_t>) {
+			if (std::holds_alternative<Medium<V>>(prog)) {
+				Medium<V> original = std::get<Medium<V>>(prog);
+				Medium<V> program = original;
+				Medium<V> command = Munch(program);
+				if (comnames.contains(std::get<Medium<V>>(ToLower(command)))) {
+					// Return exactly the length of the command + any trailing spaces
+					return original.size() - program.size();
 				}
 			}
 		}

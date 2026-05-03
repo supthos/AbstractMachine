@@ -835,6 +835,7 @@ public:
 
 		ProgramFile<char8_t> pf = ChopLine2(prog);
 
+
 		for (auto it = pf.rbegin(); it != pf.rend(); it++) {
 			//ProcessLine(*it);
 
