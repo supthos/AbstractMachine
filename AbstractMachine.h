@@ -23,12 +23,15 @@ public:
 	std::set<Medium<char8_t>> ud = { u8"unload", u8"ud" };
 	std::set<Medium<char8_t>> se = { u8"state", u8"se" };
 	std::set<Medium<char8_t>> at = { u8"accept", u8"at" };
+	std::set<Medium<char8_t>> ss = { u8"states", u8"ss" };
 
 	// identifiers or parameters
 	std::set<Medium<char8_t>> ne = { u8"name", u8"ne" };
 	std::set<Medium<char8_t>> ag = { u8"accepting", u8"ag" };
 	std::set<Medium<char8_t>> st = { u8"start", u8"st" };
 	std::set<Medium<char8_t>> tp = { u8"temp", u8"tp" };
+
+	//std::set<Medium<char8_t>> in = { u8"instruction", u8"in" };
 
 	States(std::shared_ptr<Language<char8_t>> lang) {
 		name = u8"States";
@@ -49,6 +52,8 @@ public:
 
 		language->InterpretMediumFunction(u8"accepting", ag, [this](const Medium<char8_t>& p) { return this->AcceptingSemantic(p); }, name);
 		language->InterpretNullaryFunction(u8"state", se, [this]() { return this->State(); }, name);
+
+		language->InterpretNullaryVoidFunction(u8"states", ss, [this]() { return this->PrintStates();}, name);
 	}
 
 
@@ -76,6 +81,7 @@ public:
 
 	std::vector<unsigned long long> callstack{}; // Call stack for subroutine calls, if needed in future extensions
 
+
 	unsigned long long State() const { return state; }
 
 	unsigned long long Instruction() const { return icount; }
@@ -92,6 +98,22 @@ public:
 		else {
 			std::cout << "Not Accepting State.\n";
 			return false;
+		}
+	}
+
+	void PrintStates() const {
+		std::cout << "Current States:\n";
+		Medium<char8_t> program;
+		for (const auto& [num, prog] : states) {
+			program = std::get<Medium<char8_t>>(prog);
+			std::cout << num << ": " << program;
+			if (accepting.contains(num)) {
+				std::cout << " (Accepting)";
+			}
+			if (TempState(num) != temp_states.end()) {
+				std::cout << " (Temporary)";
+			}
+			std::cout << "\n";
 		}
 	}
 
@@ -284,7 +306,6 @@ public:
 	std::set<Medium<char8_t>> movecomms = { u8"move", u8"me" };
 	std::set<Medium<char8_t>> clearcomms = { u8"clear", u8"cr" };
 
-
 	Medium<V> Tape;
 
 	long long head;
@@ -319,6 +340,7 @@ public:
 
 		language->InterpretIntegerArgumentLongLongFunction(u8"goto", gotocomms, [this](const long long& prog) { return this->GoTo(prog); }, name);
 		language->InterpretIntegerArgumentLongLongFunction(u8"move", movecomms, [this](const long long& prog) { return this->Move(prog); }, name);
+
 	}
 
 	long long Head() const { return head; }
@@ -863,6 +885,9 @@ public:
 		else if (result.type() == typeid(int)) {
 			std::cout << "Int: " << std::any_cast<int>(result) << std::endl;
 		}
+		else if (result.type() == typeid(long long)) {
+			std::cout << "LL: " << std::any_cast<long long>(result) << std::endl;
+		}
 		else if (result.type() == typeid(unsigned long long)) {
 			std::cout << "ULL: " << std::any_cast<unsigned long long>(result) << std::endl;
 		}
@@ -871,6 +896,18 @@ public:
 		}
 		else if (result.type() == typeid(double)) {
 			std::cout << "Double: " << std::any_cast<double>(result) << std::endl;
+		}
+		else if (result.type() == typeid(std::pair<States::StateKind, unsigned long long>)) {
+			auto [kind, state] = std::any_cast<std::pair<States::StateKind, unsigned long long>>(result);
+			std::cout << "State " << std::to_string(state) << " ";
+			switch (kind) {
+			case States::StateKind::NL: std::cout << "(Normal)"; break;
+			case States::StateKind::ER: std::cout << "(Error)"; break;
+			case States::StateKind::AG: std::cout << "(Accepting)"; break;
+			case States::StateKind::TP: std::cout << "(Temporary)"; break;
+
+			}
+			
 		}
 		else {
 			std::cout << "Result holds type: " << result.type().name()
@@ -907,12 +944,14 @@ public:
 
 		// 2. POP the stacks to consume the instruction, but store the rollback data
 		StateRegister->callstack.pop_back();
+		StateRegister->previous.pop_back();
+		StateRegister->instnum.pop_back();
+
+
 
 		unsigned long long callerState = StateRegister->previous.back();
-		StateRegister->previous.pop_back();
 
 		unsigned long long callerIcount = StateRegister->instnum.back();
-		StateRegister->instnum.pop_back();
 
 		// Notice: We DO NOT assign StateRegister->state = callerState here. 
 		// StateRegister->state remains 'currentState' so the instruction knows its own context.
