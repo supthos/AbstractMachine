@@ -15,9 +15,13 @@ public:
 
 	std::set<Medium<char8_t>> hp = { u8"help", u8"hp" };
 
+	Medium<char8_t> HelpExpl() {
+		return u8"Displays the available concepts in the Abstract Machine's language. {help|hp}";
+	}
+
 	Interpreter(AbstractMachine* a) {
 		A = a;
-		A->language->InterpretNullaryVoidFunction(u8"help", hp, [this]() { return this->Help(); }, context );
+		A->language->InterpretNullaryVoidFunction(u8"help", hp, [this]() { return this->Help(); }, HelpExpl(), context );
 	}
 
 	Medium<char8_t> CurrentLine;
@@ -31,6 +35,10 @@ public:
 			//const Language<char8_t>::Interpretation& I = (*Cit).second;
 			for (const auto& c : I) {
 				std::cout << "    " << std::get<0>(c) << std::endl;
+				auto expl = std::get<3>(c);
+				if (expl != u8"") {
+					std::cout << "        " << expl << std::endl;
+				}
 
 			}
 		}

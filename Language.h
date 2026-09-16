@@ -22,6 +22,7 @@
 #include <locale>
 //#include <string_view>
 #include <unordered_map>
+#include <charconv>
 
 inline std::locale currentLocale = std::locale("en_US.utf8");
 
@@ -160,6 +161,8 @@ using Medium = typename MediumHelper<V>::type;
 template <Value V>
 using ProgramFile = std::vector<Medium<V>>;
 
+template <Value V>
+using MeteredProgramFile = std::vector<std::pair<Medium<V>, unsigned long long>>;
 
 template <Value V>
 using Token = std::variant<Medium<V>, Program<V>>;
@@ -238,8 +241,8 @@ public:
 	using Semantic = std::function<std::any (const Token<V>&)>;
 	//using Semantic = std::function<Value auto (const Medium<V>&)>;
 
-	//	{ConceptName, Syntax, Semantic}
-	using Concept = std::tuple<Token<V>, Syntax, Semantic>;
+	//	{ConceptName, Syntax, Semantic, Explanation}
+	using Concept = std::tuple<Token<V>, Syntax, Semantic, Medium<char8_t>>;
 	using Interpretation = std::vector<Concept>;
 
 	//	[contextName] = Interpretation
@@ -260,6 +263,7 @@ public:
 	std::unordered_map<Medium<V>, std::vector<std::set<Medium<char8_t>>>> RegisteredNames;
 
 
+
 	Language() {
 
 	}
@@ -270,58 +274,53 @@ public:
 		// the first we list here have least precedence, the last have most precedence
 		// When listing interpretation, do so from most general to most specialized.
 		if constexpr (std::is_same_v<V, char8_t>) {
-			InterpretPredicate(iscntrl, u8"control", context);
-			InterpretPredicate(isprint, u8"printable", context);
-			InterpretPredicate(isgraph, u8"graphic", context);
-			InterpretPredicate(isalnum, u8"alphanumeric", context);
-			InterpretPredicate(isalpha, u8"alphabetical", context);
-			InterpretPredicate(isupper, u8"upper", context);
-			InterpretPredicate(islower, u8"lower", context);
-			InterpretPredicate(ispunct, u8"punctuation", context);
-			InterpretPredicate(isxdigit, u8"hexadecimal", context);
-			InterpretPredicate(isdigit, u8"digit", context);
-			InterpretPredicate(isspace, u8"space", context);
-			InterpretPredicate(isblank, u8"blank", context);
+			InterpretPredicate(iscntrl, u8"control", u8"", context);
+			InterpretPredicate(isprint, u8"printable", u8"", context);
+			InterpretPredicate(isgraph, u8"graphic", u8"", context);
+			InterpretPredicate(isalnum, u8"alphanumeric", u8"", context);
+			InterpretPredicate(isalpha, u8"alphabetical", u8"", context);
+			InterpretPredicate(isupper, u8"upper", u8"", context);
+			InterpretPredicate(islower, u8"lower", u8"", context);
+			InterpretPredicate(ispunct, u8"punctuation", u8"", context);
+			InterpretPredicate(isxdigit, u8"hexadecimal", u8"", context);
+			InterpretPredicate(isdigit, u8"digit", u8"", context);
+			InterpretPredicate(isspace, u8"space", u8"", context);
+			InterpretPredicate(isblank, u8"blank", u8"", context);
 		}
 
 	}
 
-	void AddTypeInterpretations() {
-		Medium<V> context = u8"Native Type";
-		InterpretType<bool>(context);
-		InterpretType<char>(context);
-		InterpretType<signed char>(context);
-		InterpretType<unsigned char>(context);
-		InterpretType<char8_t>(context);
-		InterpretType<char16_t>(context);
-		InterpretType<char32_t>(context);
-
-		InterpretType<short>(context);
-		InterpretType<unsigned short>(context);
-		InterpretType<int>(context);
-		InterpretType<unsigned int>(context);
-		InterpretType<long>(context);
-		InterpretType<unsigned long>(context);
-		InterpretType<long long>(context);
-		InterpretType<unsigned long long>(context);
-
-		InterpretType<float>(context);
-		InterpretType<double>(context);
-		InterpretType<long double>(context);
-	}
+	
 
 	// Helper function to extract the first token from a program, returning it and modifying the original program to remove the extracted token
 	Medium<V> Munch(Medium<V>& prog) {
 		Medium<V> program{};
 		size_t i = 0;
-		while (i < prog.size() && isspace((prog[i]))) {
+		while (i < prog.size() && isspace(prog[i]) ) {
 			++i;
 		}
+		if (i < prog.size() && prog[i] == u8'\"') {
+			//program += u8'\"';
+			++i; 
 
-		while (i < prog.size() && !isspace((prog[i]))) {
-			program += prog[i];
-			++i;
+			while (i < prog.size()) {
+				
+				if (prog[i] == u8'\"') {
+					++i; 
+					break;
+				}
+				program += prog[i];
+				++i;
+			}
+
 		}
+		else {
+			while (i < prog.size() && !isspace((prog[i]))) {
+				program += prog[i];
+				++i;
+			}
+		}
+		
 
 		while (i < prog.size() && isspace((prog[i]))) {
 			++i;
@@ -338,9 +337,26 @@ public:
 			++i;
 		}
 
-		while (i < prog.size() && !isspace((prog[i]))) {
-			program += prog[i];
+		if (i < prog.size() && prog[i] == u8'\"') {
+			//program += u8'\"';
 			++i;
+
+			while (i < prog.size()) {
+
+				if (prog[i] == u8'\"') {
+					++i;
+					break;
+				}
+				program += prog[i];
+				++i;
+			}
+
+		}
+		else {
+			while (i < prog.size() && !isspace((prog[i]))) {
+				program += prog[i];
+				++i;
+			}
 		}
 
 		while (i < prog.size() && isspace((prog[i]))) {
@@ -350,9 +366,9 @@ public:
 	}
 
 	// A Proper lexer.
-	std::vector<std::pair<Medium<V>, unsigned long long>> ChopLine (const Medium<V>& prog) {
+	MeteredProgramFile<V> ChopLine (const Medium<V>& prog) {
 		std::pair<Medium<V>, unsigned long long> program{};
-		std::vector<std::pair<Medium<V>, unsigned long long>> ProgFile{};
+		MeteredProgramFile<V> ProgFile{};
 		size_t i = 0;
 		//unsigned long long offset = 0;
 		while (i<prog.size()){
@@ -436,6 +452,7 @@ public:
 	}
 
 	// Helper function to split a program into tokens based on whitespace, using Munch to extract tokens iteratively
+	//	This is deprecated in favor of ChopLine, which also handles punctuation as separate tokens.
 	ProgramFile<V> Chunkify(Medium<V> & prog) {
 		ProgramFile<V> file;
 		while (!prog.empty()) {
@@ -548,7 +565,7 @@ public:
 	// This function returns true if its syntax is recognized from within the Concepts
 	std::vector<Interpreted> has_interpretation(const Token<V>& token) {
 		std::vector<std::tuple<const Concept*, unsigned long long, const Medium<V>>> interpretations;
-		//for (auto Cit = C.rbegin(); Cit != C.rend(); Cit++ ) {
+		//for (auto Cit = C.rbegin(); iCt != C.rend(); Cit++ ) {
 		for (auto& [CntxtName, I]: C){
 			//const Interpretation& I = (*Cit).second;
 			for (auto it = I.rbegin(); it != I.rend(); it++) {
@@ -606,7 +623,7 @@ public:
 	}
 	
 	// Base Interpret method for custom syntax and semantics of strings
-	bool Interpret(const Alphabet& a, const Token<V>& t, Syntax syn, Semantic sem, const Medium<V> context) {
+	bool Interpret(const Alphabet& a, const Token<V>& t, Syntax syn, Semantic sem, const Medium<char8_t>& expl, const Medium<V> context) {
 		// 1. Find the index or a pointer to the existing context in C
 		bool isNew = (C.find(context) == C.end());
 		Interpretation& targetInterp = C[context];
@@ -633,7 +650,7 @@ public:
     
 		if (is_word(t)) {
 			// 5. CRITICAL: Push to the persistent Interpretation vector in C
-			targetInterp.push_back(std::make_tuple(t, syn, sem));
+			targetInterp.push_back(std::make_tuple(t, syn, sem, expl));
 			std::set<Medium<V>> n = { std::get<Medium<V>>(t) };
 			RegisteredNames[context].push_back(n);
 			return true;
@@ -641,7 +658,7 @@ public:
 		return false;
 	}
 
-	bool Interpret(const Alphabet& a, const Token<V>& t, const std::set<Medium<V>>& comms, Syntax syn, Semantic sem, const Medium<V> context) {
+	bool Interpret(const Alphabet& a, const Token<V>& t, const std::set<Medium<V>>& comms, Syntax syn, Semantic sem, const Medium<char8_t>& expl, const Medium<V> context) {
 		bool s = false;
 		for (const auto& n : comms) {
 			s = s || (is_registered(n, context));
@@ -657,6 +674,7 @@ public:
 			t,
 			syn,
 			sem,
+			expl,
 			context
 		);
 
@@ -669,66 +687,54 @@ public:
 	}
 
 	// Interpret method overload for Value-returning functions with no arguments.
-	bool Interpret(const Token<V>& t, std::function <std::any ()> f, Medium<V> context) {
+	bool Interpret(const Token<V>& t, std::function <std::any ()> f, const Medium<char8_t>& expl, const Medium<V>& context) {
 		return Interpret(
 			std::set<Program<V>>{},
 			t,
 			[this, t](const Token<V>& prog) { return this->NameSyntax(t, prog); },
 			[this, f](const Token<V>& prog) {return this->NullarySemantic(f); },
+			expl,
 			context);
 	}
 
-	bool InterpretNullaryFunction(const Token<V>& t, const std::set<Medium<V>>& comms, std::function<std::any ()> f, Medium<V> context) {
+	bool InterpretNullaryFunction(const Token<V>& t, const std::set<Medium<V>>& comms, std::function<std::any ()> f, const Medium<char8_t>& expl, const Medium<V>& context) {
 		return Interpret(
 			std::set<Program<V>>{},
 			t,
 			comms,
 			[this, comms](const Token<V>& prog) { return this->NullaryFunctionSyntax(prog, comms); },
 			[this, f](const Token<V>& prog) { return this->NullarySemantic(f); },
+			expl,
 			context
 		);
 	}
 
-	bool InterpretNullaryVoidFunction(const Token<V>& t, const std::set<Medium<V>>& comms, std::function<void()> f, Medium<V> context) {
+	bool InterpretNullaryVoidFunction(const Token<V>& t, const std::set<Medium<V>>& comms, std::function<void()> f, const Medium<char8_t>& expl, const Medium<V>& context) {
 		return Interpret(
 			std::set<Program<V>>{},
 			t,
 			comms,
 			[this, comms](const Token<V>& prog) { return this->NullaryFunctionSyntax(prog, comms); },
 			[this, f](const Token<V>& prog) { this->VoidSemantic(f); return std::any{}; },
+			expl,
 			context
 		);
 	}
 
 	// Interpret method overload for Value types, or any object.
-	bool Interpret(const Token<V>& t, std::any a, Medium<V> context) {
+	bool Interpret(const Token<V>& t, std::any a, const Medium<char8_t>& expl, const Medium<V>& context) {
 		return Interpret(
 			std::set<Program<V>>{},
 			t,
-			[this, t](const Token<V>& prog) { return this->NameSyntax(t, prog); },
+			[this, t](const Token<V>& prog) { return this->ResourceNameSyntax(t, prog); },
 			[this, a](const Token<V>& prog) {return this->IdentitySemantic(a); },
+			expl,
 			context
 		);
 	}
+	
 
-	// Helper function to interpret a type T by adding its name to the alphabet 
-	// and defining its interpretation safely across different character types V.
-	template<typename T>
-	bool InterpretType(Medium<V> context) {
-		const char* raw_name = typeid(T).name();
-		std::string narrow_name(raw_name);
-
-		// Convert narrow string to the Medium<V> (u8string/string)
-		Medium<V> type_name(narrow_name.begin(), narrow_name.end());
-
-		if (std::get<0>(has_interpretation(type_name, context)) == nullptr) {
-			T epsilon {};
-			return Interpret(type_name, epsilon, context);
-		}
-		return false;
-	}
-
-	bool InterpretPredicate(bool(*predicate)(char32_t), const Token<V>& name, const Medium<V>& context) {
+	bool InterpretPredicate(bool(*predicate)(char32_t), const Token<V>& name, const Medium<char8_t>& expl, const Medium<V>& context) {
 		return Interpret(
 			GetCharacterSet(predicate),
 			name,
@@ -740,39 +746,43 @@ public:
 				return 0;
 			},
 			[this](const Token<V>& prog) { return this->IdentitySemantic(prog); },
+			expl,
 			context
 		);
 	}
 
-	bool InterpretMediumFunction(const Token<V>& name, const std::set<Medium<V>>& comms, std::function<std::any(const Medium<V>&)> f, Medium<V> context) {
+	bool InterpretMediumFunction(const Token<V>& name, const std::set<Medium<V>>& comms, std::function<std::any(const Medium<V>&)> f, const Medium<char8_t>& expl, const Medium<V>& context) {
 		return Interpret(
 			std::set<Program<V>>{}, 
 			name, 
 			comms,
 			[this, comms](const Token<V>& prog) { return this->MediumFunctionSyntax(prog, comms); },
 			[this, f](const Token<V>& prog) { return this->MediumFunctionSemantic(prog, f); },
+			expl,
 			context
 		);
 	}
 
-	bool InterpretIntegerArgumentMediumFunction(const Token<V>& name, const std::set<Medium<V>>& comms, std::function<std::any(const Medium<V>&)> f, Medium<V> context) {
+	bool InterpretIntegerArgumentMediumFunction(const Token<V>& name, const std::set<Medium<V>>& comms, std::function<std::any(const Medium<V>&)> f, const Medium<char8_t>& expl, const Medium<V>& context) {
 		return Interpret(
 			std::set<Program<V>>{},
 			name,
 			comms,
 			[this, comms](const Token<V>& prog) { return this->IntegerArgumentSyntax(prog, comms); },
 			[this, f](const Token<V>& prog) {return this->MediumFunctionSemantic(prog, f);	},
+			expl,
 			context
 		);
 	}
 
-	bool InterpretIntegerArgumentLongLongFunction(const Token<V>& name, const std::set<Medium<V>>& comms, std::function<std::any(const long long&)> f, Medium<V> context) {
+	bool InterpretIntegerArgumentLongLongFunction(const Token<V>& name, const std::set<Medium<V>>& comms, std::function<std::any(const long long&)> f, const Medium<char8_t>& expl, const Medium<V>& context) {
 		return Interpret(
 			std::set<Program<V>>{},
 			name,
 			comms,
 			[this, comms](const Token<V>& prog) { return this->IntegerArgumentSyntax(prog, comms); },
 			[this, f](const Token<V>& prog) {return this->LongLongFunctionSemantic(prog, f);	},
+			expl,
 			context
 		);
 	}
@@ -781,6 +791,20 @@ public:
 	unsigned long long NameSyntax(const Token<V>& t, const Token<V>& program) {
 		if constexpr (Text<V> && std::is_same_v<V, char8_t>) {
 			if (str_predicate(isalpha, t) && t == program) {
+				if (std::holds_alternative<Program<V>>(t)) {
+					return 1; // Single character token has length 1
+				}
+				else if (std::holds_alternative<Medium<V>>(t)) {
+					return std::get<Medium<V>>(t).size();
+				}
+			}
+		}
+		return 0;
+	}
+
+	unsigned long long ResourceNameSyntax(const Token<V>& t, const Token<V>& program) {
+		if constexpr (Text<V> && std::is_same_v<V, char8_t>) {
+			if (t == program) {
 				if (std::holds_alternative<Program<V>>(t)) {
 					return 1; // Single character token has length 1
 				}
@@ -851,6 +875,26 @@ public:
 		return 0;
 	}
 
+	Medium<char8_t>IdentifierExpl() const { return u8"{alpha}[*[alpha|digit|underscore]]"; }
+
+	unsigned long long IdentifierSyntax(const Token<V>& prog) {
+		if constexpr (Text<V> && std::is_same_v<V, char8_t>) {
+			if (std::holds_alternative<Medium<V>>(prog)) {
+				Medium<V> program = std::get<Medium<V>>(prog);
+				Medium<V> identifier = Lick(program);
+				if (IdentifierPredicate(identifier)) {
+					return std::get<Medium<V>>(prog).size() - program.size();
+				}
+			}
+		}
+		return 0;
+	}
+
+	Medium<char8_t> IdentifierSemantic(const Token<V>& prog) {
+		Medium<char8_t> identifier = std::get<Medium<char8_t>>(prog);
+		return identifier;
+	}
+
 	std::any MediumFunctionSemantic(const Token<V>& prog, std::function<std::any(const Medium<V>&)> f) {
 		Medium<char8_t> program = std::get<Medium<char8_t>>(prog);
 		//Munch(program);
@@ -864,7 +908,7 @@ public:
 	}
 
 	std::any Evaluate(const Concept& C, const Token<V>& prog) {
-		auto [name, syn, sem] = C;
+		auto [name, syn, sem, expl] = C;
 		return sem(prog);
 	}
 
@@ -929,6 +973,32 @@ public:
 		return false;
 	}
 
+	//	This function checks if a given program is a valid identifier according to the rules 
+	//	of the language.
+	//	An identifier must start with an alphabetic character and can be followed by 
+	//	alphanumeric characters or underscores.
+	bool IdentifierPredicate(const Medium<V>& prog) {
+		if (prog.empty()) return false;
+		Medium<V> iprog = prog;
+		Medium<V> program = Munch(iprog);
+		if (!iprog.empty()) return false;
+		//auto tokens = ChopLine(program);
+
+		unsigned long long count = 0;
+		char8_t buffer = program[count];
+
+		if (!str_predicate(isalpha, buffer)) return false;
+		count++;
+
+		while (count < program.size()) {
+			buffer = program[count];
+			if (!str_predicate(isalnum, buffer) && buffer != u8'_') return false;
+			count++;
+		}
+
+		return true;
+	}
+
 };
 
 // Character Set operations
@@ -951,4 +1021,97 @@ inline bool Inclusion (std::set<unsigned char>&A, std::set<unsigned char>&B){
 	return std::includes(A.begin(), A.end(),
 							B.begin(), B.end());
 }
+
+
+// The Symbol struct represents a symbol in the language, which can hold a value of an arithmetic type and can be constructed from a program (text) representation. It also provides an implicit conversion to the underlying value type and to the program representation.
+// It unifies the handling of conversion of arithmetic types to text. I guess it is a form of serialization.
+template <Arithmetic A, Text T>
+struct Symbol {
+	A value;
+	using inner_type = A;
+
+	Symbol() : value(A{}) {}
+	Symbol(const A& val) : value(val) {}
+
+	bool operator==(const Symbol& other) const noexcept { return value == other.value; }
+	bool operator==(const A& other) const noexcept { return value == other; }
+
+	// Input Conversion: Program<T> -> A
+	Symbol(const Program<T>& p) {
+		if (p.empty()) {
+			value = A{};
+			return;
+		}
+
+		if constexpr (std::is_same_v<A, bool>) {
+			std::u8string lower_p;
+			lower_p.reserve(p.size());
+
+			// Safe lambda to prevent overload resolution errors and sign extension UB
+			std::transform(p.begin(), p.end(), std::back_inserter(lower_p), [](auto c) {
+				return static_cast<char8_t>(std::tolower(static_cast<unsigned char>(c)));
+				});
+
+			value = (lower_p == u8"true" || lower_p == u8"1");
+		}
+		else if constexpr (std::is_arithmetic_v<A> && !Text<A>) {
+			const char* first = reinterpret_cast<const char*>(p.data());
+			const char* last = reinterpret_cast<const char*>(p.data() + p.size());
+
+			auto res = std::from_chars(first, last, value);
+
+			auto ptr = reinterpret_cast<decltype(p.data())>(res.ptr);
+			auto ec = res.ec;
+
+			if (ec != std::errc{}) {
+				value = A{};
+			}
+		}
+		else if constexpr (Text <A>) {
+			value = A(p.data());
+		}
+		else {
+			value = A{};
+		}
+	}
+
+	// Output Conversion: A -> Program<T>
+	operator Program<T>() const {
+		if constexpr (std::is_same_v<A, bool>) {
+			if constexpr (String<T>) {
+				return value ? T(u8"true") : T(u8"false");
+			}
+			else {
+				return value ? static_cast<T>('1') : static_cast<T>('0');
+			}
+		}
+		else if constexpr (std::is_arithmetic_v<A>) {
+			char buffer[64];
+
+			auto res = std::from_chars(reinterpret_cast<const char*>(buffer),
+				reinterpret_cast<const char*>(buffer + sizeof(buffer)),
+				value);
+			auto ptr = reinterpret_cast<decltype(buffer)>(res.ptr);
+			auto ec = res.ec;
+
+			if (ec == std::errc{}) {
+				std::u8string temp(reinterpret_cast<const char8_t*>(buffer), ptr - buffer);
+
+				if constexpr (String<T>) {
+					return T(temp.begin(), temp.end());
+				}
+				else if constexpr (Char<T>) {
+					// Returns the first digit character rather than converting raw code point
+					return temp.empty() ? T{} : static_cast<T>(temp[0]);
+				}
+			}
+		}
+		return Program<T>{};
+	}
+
+	operator A() const noexcept {
+		return value;
+	}
+};
+
 
