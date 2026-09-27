@@ -1025,6 +1025,7 @@ inline bool Inclusion (std::set<unsigned char>&A, std::set<unsigned char>&B){
 
 // The Symbol struct represents a symbol in the language, which can hold a value of an arithmetic type and can be constructed from a program (text) representation. It also provides an implicit conversion to the underlying value type and to the program representation.
 // It unifies the handling of conversion of arithmetic types to text. I guess it is a form of serialization.
+// It counts as a value type, so it can be used in the Language class to represent symbols in the alphabet and in interpretations.
 template <Arithmetic A, Text T>
 struct Symbol {
 	A value;

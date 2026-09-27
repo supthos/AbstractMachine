@@ -1,4 +1,4 @@
-//  AbstractMachine.h : This file defines the AbstractMachine class, which represents a Turing-complete computational model. The AbstractMachine has a tape (modeled by the Substrate resource) and a state register (modeled by the States resource). It can interpret and execute programs written in its language, which is defined by the Language class. The AbstractMachine can be extended with additional resources and commands as needed.
+//  AbstractMachine.h : This file defines the AbstractMachine class, which represents a Turing-complete computational model. The AbstractMachine has a tape (modeled by the Support resource) and a state register (modeled by the States resource). It can interpret and execute programs written in its language, which is defined by the Language class. The AbstractMachine can be extended with additional resources and commands as needed.
 //	Copyright © 2026 Guillermo M. Dávila Andino
 
 #pragma once
@@ -377,10 +377,10 @@ public:
 
 
 
-// The Value V of the substrate is the type of the symbols on the tape. It can be any type that satisfies the Value concept, which includes primitive types (like char, int, bool) and user-defined types that can be constructed from a string representation. 
-// The programs that are read are written in ProgramFile<char8_t>. The same as the AbstractMachine's language. The Substrate is a resource of the AbstractMachine, and it provides the basic operations that the machine can perform on its tape. 
+// The Value V of the Support is the type of the symbols on the tape. It can be any type that satisfies the Value concept, which includes primitive types (like char, int, bool) and user-defined types that can be constructed from a string representation. 
+// The programs that are read are written in ProgramFile<char8_t>. The same as the AbstractMachine's language. The Support is a resource of the AbstractMachine, and it provides the basic operations that the machine can perform on its tape. 
 template <Value V>
-class Substrate : public Resource {
+class Support : public Resource {
 public:
 	void parse_and_store(const Medium<char8_t>& id, const Medium<char8_t>& prog) override { /* ... */ };
 	std::set<Medium<char8_t>> readcomms = { u8"read", u8"rd" };
@@ -399,7 +399,7 @@ public:
 	unsigned char order;
 
 
-	Substrate(std::shared_ptr<Language<char8_t>> lang) {
+	Support(std::shared_ptr<Language<char8_t>> lang) {
 		language = lang;
 
 		name = u8"Tape";
@@ -817,11 +817,11 @@ public:
 	//Language<char8_t> language;
 	std::shared_ptr<Language<char8_t>> language;
 	std::vector<std::unique_ptr<Resource>> Resources;
-	std::vector<std::unique_ptr<Resource>> Types;
+	std::vector<std::shared_ptr<Resource>> Types;
 
 	//std::vector<Token<char8_t>> ResourceRegistry;
 
-	Substrate<bool>* Tape;
+	Support<bool>* Tape;
 	States* StateRegister;
 
 	std::set<Medium<char8_t>> RunComms = { u8"run", u8"rn" };
@@ -895,7 +895,7 @@ public:
 		);
 
 
-		AddResource(std::make_unique<Substrate<bool>>(language), u8"Resource", u8"Tape abstraction", Resources);
+		AddResource(std::make_unique<Support<bool>>(language), u8"Resource", u8"Tape abstraction", Resources);
 		AddResource(std::make_unique<States>(language), u8"Resource", u8"State abstraction", Resources);
 
 		language->Interpret(
@@ -918,7 +918,7 @@ public:
 			name
 		);
 
-		Tape = static_cast<Substrate<TapeSymbol>*>(Resources[0].get());
+		Tape = static_cast<Support<TapeSymbol>*>(Resources[0].get());
 		StateRegister = static_cast<States*>(Resources[1].get());
 	}
 
@@ -968,7 +968,7 @@ public:
 		//	T epsilon {};
 		//	return Interpret(type_name, epsilon, context);
 		//}
-		AddResource(std::make_unique<Type<T>>(language), context, u8"", Types);
+		AddResource(std::make_shared<Type<T>>(language), context, u8"", Types);
 
 		return false;
 	}
@@ -1253,6 +1253,18 @@ public:
 		}
 	}
 
+	void AddResource(std::shared_ptr<Resource> res, const Medium<char8_t> context, Medium<char8_t> expl, std::vector<std::shared_ptr<Resource>>& resourceVector) {
+		if (language->is_word(res->name) && !language->is_registered(res->name, context)) {
+			resourceVector.push_back(res);
+			auto resPtr = resourceVector.back().get();
+
+			Medium<char8_t> t = resPtr->name;
+
+			// register the resource using the raw pointer as the payload (same style as unique_ptr overload)
+			language->Interpret(t, std::any(resPtr), expl, context);
+		}
+	}
+
 	void RemoveResource(const Medium<char8_t>& name, const Medium<char8_t> context, std::vector<std::unique_ptr<Resource>>& resourceVector) {
 
 
@@ -1290,8 +1302,8 @@ public:
 
 	void Start() {
 		if (!is_resource(u8"Tape", u8"Resource")) {
-			AddResource(std::make_unique<Substrate<bool>>(language), u8"Resource", u8"Tape abstraction", Resources);
-			Tape = static_cast<Substrate<TapeSymbol>*>(Resources.back().get());
+			AddResource(std::make_unique<Support<bool>>(language), u8"Resource", u8"Tape abstraction", Resources);
+			Tape = static_cast<Support<TapeSymbol>*>(Resources.back().get());
 		}
 		if (!is_resource(u8"States", u8"Resource")) {
 			AddResource(std::make_unique<States>(language), u8"Resource", u8"State abstraction", Resources);
@@ -1310,8 +1322,8 @@ public:
 	}
 	void Start(unsigned char n) {
 		if (!is_resource(u8"Tape", u8"Resource")) {
-			AddResource(std::make_unique<Substrate<bool>>(language), u8"Resource", u8"Tape abstraction", Resources);
-			Tape = static_cast<Substrate<TapeSymbol>*>(Resources.back().get());
+			AddResource(std::make_unique<Support<bool>>(language), u8"Resource", u8"Tape abstraction", Resources);
+			Tape = static_cast<Support<TapeSymbol>*>(Resources.back().get());
 		}
 		if (!is_resource(u8"States", u8"Resource")) {
 			AddResource(std::make_unique<States>(language), u8"Resource", u8"State abstraction", Resources);
@@ -1716,10 +1728,10 @@ public:
 		auto cncpt = std::get<0>(typeInterp);
 
 		if (cncpt != nullptr) {
-			Resource* type_pointer = nullptr;
+			std::shared_ptr<Resource> type_pointer = nullptr;
 			for (auto it = Types.begin(); it != Types.end(); it++) {
 				if ((*it)->name == type) {
-					type_pointer = (*it).get();
+					type_pointer = (*it);
 					break;
 				}
 			}
