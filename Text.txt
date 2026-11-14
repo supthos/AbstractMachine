@@ -30,6 +30,25 @@ load name subci write 1 end
 load name c branch 0 subco subci
 call a
 
+Sigma 5-state Busy Beaver (1RB1RA_1LC1LB_1RA1LD_1RA1LE_1RZ0LC):
+reset
+load name subao write 1 right call b
+load name subai right call a
+load name a branch 0 subao subai
+load name subbo write 1 left call c
+load name subbi left call b
+load name b branch 0 subbo subbi
+load name subco write 1 right call a
+load name subci left call d
+load name c branch 0 subco subci
+load name subdo write 1 right call a
+load name subdi left call e
+load name d branch 0 subdo subdi
+load name subeo write 1 right call z
+load name subei write 0 left call c
+load name e branch 0 subeo subei
+load accept name z end
+call a
 
 Recursive addition:
 load name iszero write 1
