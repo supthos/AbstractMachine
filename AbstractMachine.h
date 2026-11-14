@@ -14,6 +14,7 @@ public:
 	//Language<char8_t> language;
 	//std::any resource;
 	virtual void parse_and_store(const Medium<char8_t>& id, const Medium<char8_t>& prog) = 0;
+
 };
 
 template<typename T>
@@ -1125,7 +1126,7 @@ public:
 	}
 
 	Medium<char8_t> RunExpl() const {
-		return u8"Runs the programs in the stack. Internal function. \n ";
+		return u8"Runs the programs in the stack. Internal function.";
 	}
 
 	std::vector<std::tuple<Token<char8_t>, std::any, unsigned long long>> Run(const Medium<char8_t>& program) {
@@ -1159,14 +1160,23 @@ public:
 
 		// 2. POP the stacks to consume the instruction, but store the rollback data
 		StateRegister->callstack.pop_back();
-		StateRegister->previous.pop_back();
-		StateRegister->instnum.pop_back();
 
+		unsigned long long callerState = 0;
 
+		unsigned long long callerIcount = 0;
 
-		unsigned long long callerState = StateRegister->previous.back();
+		if (!StateRegister->previous.empty()) {
+			callerState = StateRegister->previous.back();
+			StateRegister->previous.pop_back();
 
-		unsigned long long callerIcount = StateRegister->instnum.back();
+		} 
+		
+		if (!StateRegister->instnum.empty()) {
+			callerIcount = StateRegister->instnum.back();
+			StateRegister->instnum.pop_back();
+
+		}
+
 
 		// Notice: We DO NOT assign StateRegister->state = callerState here. 
 		// StateRegister->state remains 'currentState' so the instruction knows its own context.
@@ -1317,6 +1327,7 @@ public:
 		StateRegister->states.clear();
 		StateRegister->instnum.clear();
 		StateRegister->previous.clear();
+		StateRegister->callstack.clear();
 
 		StateRegister->Load(u8"load name null nothing");
 	}
@@ -1337,6 +1348,8 @@ public:
 		StateRegister->states.clear();
 		StateRegister->instnum.clear();
 		StateRegister->previous.clear();
+		StateRegister->callstack.clear();
+
 		StateRegister->Load(u8"load name null nothing");
 	}
 
@@ -1742,8 +1755,11 @@ public:
 				type_pointer->parse_and_store(name, prog);
 			}
 
+			return true;
+
 		}
 
+		return false;
 	}
 
 	Medium<char8_t> ResetExpl() const {
